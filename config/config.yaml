@@ -1,0 +1,7 @@
+execution:
+  mode: batch
+  frequency: daily
+
+storage:
+  format: parquet
+  partition_by: date
