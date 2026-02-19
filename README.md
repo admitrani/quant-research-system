@@ -2,8 +2,7 @@
 
 ## 🎯 Objective
 
-This project aims to build a production-ready data engineering system
-for financial market data ingestion, transformation, and feature generation.
+This project aims to build a production-ready data engineering system for financial market data ingestion, transformation, and feature generation.
 
 The long-term goal is to support quantitative trading strategies
 with a robust, scalable, and reproducible data pipeline.
