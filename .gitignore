@@ -218,3 +218,6 @@ storage/gold/*
 
 # Logs
 *.log
+
+# Ignore API keys
+*.env

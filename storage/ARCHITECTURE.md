@@ -23,3 +23,14 @@ Data modeling approach:
 - Silver: structured fact/dimension separation.
 - Gold: analytical denormalized datasets for ML.
 - Primary key for prices: (asset_id, timestamp).
+
+Future consideration:
+- Event-driven ingestion for live execution layer.
+- CDC patterns for operational systems.
+Current architecture: Batch-first.
+
+Raw layer rules:
+- Immutable
+- Append-only
+- Partitioned by year/month
+- No transformations allowed

@@ -1,3 +1,33 @@
+import logging
+from pathlib import Path
+
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+
+log_file = LOG_DIR / "pipeline.log"
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Formatter común
+formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)s | %(message)s"
+)
+
+# Handler consola
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(formatter)
+
+# Handler archivo
+file_handler = logging.FileHandler(log_file)
+file_handler.setFormatter(formatter)
+
+# Evitar duplicados si reinicias
+if not logger.handlers:
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+
 from orchestration.stages import (
     run_ingestion,
     run_silver_transformations,
@@ -8,24 +38,31 @@ from orchestration.stages import (
 # Current execution mode: batch
 
 def run_pipeline():
+
+    logging.info("=" * 60)
+    logging.info("Starting pipeline execution")
+
     try:
-        print("Stage 1: Ingestion")
+        logging.info("Stage 1: Ingestion")
         run_ingestion()
 
-        print("Stage 2: Silver transformations")
+        logging.info("Stage 2: Silver transformations")
         run_silver_transformations()
 
-        print("Stage 3: Gold transformations")
+        logging.info("Stage 3: Gold transformations")
         run_gold_transformations()
 
-        print("Stage 4: Model stage")
+        logging.info("Stage 4: Model stage")
         run_model_stage()
 
-        print("Pipeline finished successfully.")
+        logging.info("Pipeline finished successfully.")
 
     except Exception as e:
-        print(f"Pipeline failed: {e}")
+        logging.exception("Pipeline failed with error.")
         raise
+
+    finally:
+        logging.info("=" * 60)
 
 if __name__ == "__main__":
     run_pipeline()
