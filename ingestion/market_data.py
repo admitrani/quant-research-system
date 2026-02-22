@@ -6,9 +6,7 @@ from ingestion.api_client import APIClient
 BASE_URL = "https://api.binance.com"
 
 
-# ---------------------------------------------------
 # GET LAST TIMESTAMP (Watermark real desde Raw)
-# ---------------------------------------------------
 
 def get_last_timestamp(symbol="BTCUSDT", interval="1h"):
 
@@ -37,9 +35,7 @@ def get_last_timestamp(symbol="BTCUSDT", interval="1h"):
     return max_timestamp
 
 
-# ---------------------------------------------------
 # FETCH KLINES (Incremental + Paginación)
-# ---------------------------------------------------
 
 def fetch_klines(
     symbol="BTCUSDT",
@@ -55,9 +51,7 @@ def fetch_klines(
     end_time = int(datetime.utcnow().timestamp() * 1000)
     last_ts = get_last_timestamp(symbol, interval)
 
-    # ---------------------------------------------------
     # Determinar start_time
-    # ---------------------------------------------------
 
     if start_date:
         start_time = int(start_date.timestamp() * 1000)
@@ -72,9 +66,7 @@ def fetch_klines(
 
     all_data = []
 
-    # ---------------------------------------------------
     # Loop de paginación
-    # ---------------------------------------------------
 
     while True:
 
@@ -109,9 +101,7 @@ def fetch_klines(
     return df
 
 
-# ---------------------------------------------------
 # SAVE RAW (Particionado por fecha real + Append inteligente)
-# ---------------------------------------------------
 
 def save_raw(df, symbol="BTCUSDT", interval="1h"):
 
