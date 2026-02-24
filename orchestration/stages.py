@@ -3,10 +3,14 @@ from ingestion.market_data import fetch_klines, save_raw, get_last_timestamp
 from ingestion.audit import basic_raw_checks
 from pathlib import Path
 import logging
+import duckdb
+import os
 
 
 SYMBOL = "BTCUSDT"
 INTERVAL = "1h"
+
+logger = logging.getLogger(__name__)
 
 
 def run_ingestion():
@@ -23,10 +27,10 @@ def run_ingestion():
     )
 
     if df.empty:
-        logging.info("Nothing to ingest.")
+        logger.info("Nothing to ingest.")
     else:
         save_raw(df, symbol=SYMBOL, interval=INTERVAL)
-        logging.info(f"Ingested {len(df)} candles.")
+        logger.info(f"Ingested {len(df)} candles.")
 
     base_path = Path(
         f"storage/raw/source=binance/dataset=klines/"
@@ -37,22 +41,57 @@ def run_ingestion():
 
     report = basic_raw_checks(base_path, interval_ms)
     
-    logging.info("Raw ingestion summary:")
-    logging.info(f"Total candles: {report['total_candles']}")
-    logging.info(f"Duplicates: {report['duplicates']}")
-    logging.info(f"Is sorted: {report['is_sorted']}")
-    logging.info(f"Gaps detected: {report['gaps']}")
-    logging.info(f"Missing candles: {report['missing_candles']}")
+    logger.info("Raw ingestion summary:")
+    logger.info(f"Total candles: {report['total_candles']}")
+    logger.info(f"Duplicates: {report['duplicates']}")
+    logger.info(f"Is sorted: {report['is_sorted']}")
+    logger.info(f"Gaps detected: {report['gaps']}")
+    logger.info(f"Missing candles: {report['missing_candles']}")
 
     if report["duplicates"] > 0:
-        logging.warning("Duplicates detected in raw data.")
+        logger.warning("Duplicates detected in raw data.")
 
     if report["gaps"] > 0:
-        logging.warning("Temporal gaps detected in raw data.")
+        logger.warning("Temporal gaps detected in raw data.")
 
 
 def run_silver_transformations():
-    pass
+    
+    logger.info("Materializing Silver layer...")
+
+    con = duckdb.connect("warehouse.duckdb")
+
+    # Create raw view
+    raw_sql = Path("transformations/models/raw/raw_prices.sql").read_text()
+    con.execute(f"CREATE OR REPLACE VIEW raw_prices AS {raw_sql}")
+
+    # Remove previous Silver table
+    con.execute("DROP TABLE IF EXISTS silver_prices")
+
+    # Create materialized Silver table
+    silver_sql = Path("transformations/models/silver/silver_prices.sql").read_text()
+    con.execute(f"CREATE TABLE silver_prices AS {silver_sql}")
+
+    # Validate transformation checks
+    logger.info("Running Silver validation...")
+    from transformations.validators.silver_validator import validate_silver_prices
+    validate_silver_prices(con)
+
+    # Remove previous Silver parquet
+    silver_storage_path = "storage/silver/prices.parquet"
+    if os.path.exists(silver_storage_path):
+        os.remove(silver_storage_path)
+
+    # Export Silver to Parquet
+    con.execute(f"""
+        COPY silver_prices
+        TO '{silver_storage_path}'
+        (FORMAT PARQUET);
+    """)
+
+    con.close()
+
+    logger.info("Silver layer materialized successfully.")
 
 
 def run_gold_transformations():

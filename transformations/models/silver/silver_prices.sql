@@ -1,6 +1,6 @@
 WITH raw_data AS (
     SELECT *
-    FROM read_parquet('storage/raw/source=binance/dataset=klines/symbol=BTCUSDT/interval=1h/**/*.parquet')
+    FROM raw_prices
 ),
 
 typed AS (
@@ -48,5 +48,4 @@ SELECT
     taker_buy_base_volume,
     taker_buy_quote_volume,
     open_time_utc
-FROM deduplicated
-ORDER BY open_time;
+FROM deduplicated;

@@ -6,26 +6,16 @@ LOG_DIR.mkdir(exist_ok=True)
 
 log_file = LOG_DIR / "pipeline.log"
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-# Formatter común
-formatter = logging.Formatter(
-    "%(asctime)s | %(levelname)s | %(message)s"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file)
+    ]
 )
 
-# Handler consola
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-
-# Handler archivo
-file_handler = logging.FileHandler(log_file)
-file_handler.setFormatter(formatter)
-
-# Evitar duplicados si reinicias
-if not logger.handlers:
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+logger = logging.getLogger(__name__)
 
 
 from orchestration.stages import (
@@ -39,30 +29,30 @@ from orchestration.stages import (
 
 def run_pipeline():
 
-    logging.info("=" * 60)
-    logging.info("Starting pipeline execution")
+    logger.info("=" * 60)
+    logger.info("Starting pipeline execution")
 
     try:
-        logging.info("Stage 1: Ingestion")
+        logger.info("Stage 1: Ingestion")
         run_ingestion()
 
-        logging.info("Stage 2: Silver transformations")
+        logger.info("Stage 2: Silver transformations")
         run_silver_transformations()
 
-        logging.info("Stage 3: Gold transformations")
+        logger.info("Stage 3: Gold transformations")
         run_gold_transformations()
 
-        logging.info("Stage 4: Model stage")
+        logger.info("Stage 4: Model stage")
         run_model_stage()
 
-        logging.info("Pipeline finished successfully.")
+        logger.info("Pipeline finished successfully.")
 
     except Exception as e:
-        logging.exception("Pipeline failed with error.")
+        logger.exception("Pipeline failed with error.")
         raise
 
     finally:
-        logging.info("=" * 60)
+        logger.info("=" * 60)
 
 if __name__ == "__main__":
     run_pipeline()
