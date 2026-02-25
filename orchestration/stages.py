@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 def run_ingestion():
 
+    logger.info("Starting ingestion...")
+
     if get_last_timestamp(SYMBOL, INTERVAL) is None:
         bootstrap_start = datetime(2020, 1, 1)
     else:
@@ -26,7 +28,25 @@ def run_ingestion():
         start_date=bootstrap_start
     )
 
-    if df.empty:
+    new_rows = len(df)
+    logger.info(f"New rows this run: {new_rows}")
+    had_new_data = new_rows > 0
+
+    #Runtime duplicate check on this batch
+    if new_rows > 0:
+        batch_duplicates = df["0"].duplicated().sum()
+
+        logger.info(f"Duplicates in current batch: {batch_duplicates}")
+
+        if batch_duplicates > 0:
+            logger.error("Duplicates detected in ingestion batch.")
+            raise Exception("Raw batch duplicate violation")
+
+    #Runtime sanity check on volume of new data
+    if new_rows > 1000: #adjustable
+        logger.warning(f"Unusually high number of new candles ingested.")
+
+    if new_rows == 0:
         logger.info("Nothing to ingest.")
     else:
         save_raw(df, symbol=SYMBOL, interval=INTERVAL)
@@ -49,49 +69,87 @@ def run_ingestion():
     logger.info(f"Missing candles: {report['missing_candles']}")
 
     if report["duplicates"] > 0:
-        logger.warning("Duplicates detected in raw data.")
+        logger.error("Duplicates detected in raw data.")
+        raise Exception("Raw duplicate violation")
 
     if report["gaps"] > 0:
         logger.warning("Temporal gaps detected in raw data.")
+        logger.warning(f"Missing candles: {report['missing_candles']}")
+    
+    return had_new_data
 
 
-def run_silver_transformations():
+def run_silver_transformations(had_new_data):
     
     logger.info("Materializing Silver layer...")
 
     con = duckdb.connect("warehouse.duckdb")
 
-    # Create raw view
-    raw_sql = Path("transformations/models/raw/raw_prices.sql").read_text()
-    con.execute(f"CREATE OR REPLACE VIEW raw_prices AS {raw_sql}")
+    try:
+        # Create raw view
+        raw_sql = Path("transformations/models/raw/raw_prices.sql").read_text()
+        con.execute(f"CREATE OR REPLACE VIEW raw_prices AS {raw_sql}")
 
-    # Remove previous Silver table
-    con.execute("DROP TABLE IF EXISTS silver_prices")
+        # Remove previous Silver table
+        con.execute("DROP TABLE IF EXISTS silver_prices")
 
-    # Create materialized Silver table
-    silver_sql = Path("transformations/models/silver/silver_prices.sql").read_text()
-    con.execute(f"CREATE TABLE silver_prices AS {silver_sql}")
+        # Create materialized Silver table
+        silver_sql = Path("transformations/models/silver/silver_prices.sql").read_text()
+        con.execute(f"CREATE TABLE silver_prices AS {silver_sql}")
 
-    # Validate transformation checks
-    logger.info("Running Silver validation...")
-    from transformations.validators.silver_validator import validate_silver_prices
-    validate_silver_prices(con)
+        # Validate model
+        logger.info("Running Silver validation...")
+        from transformations.validators.silver_validator import validate_silver_prices
+        validate_silver_prices(con)
 
-    # Remove previous Silver parquet
-    silver_storage_path = "storage/silver/prices.parquet"
-    if os.path.exists(silver_storage_path):
-        os.remove(silver_storage_path)
+        # Runtime null ratio check
+        logger.info("Running runtime null ratio checks...")
+        row_count = con.execute("SELECT COUNT(*) FROM silver_prices").fetchone()[0]
+        null_close = con.execute("SELECT COUNT(*) FROM silver_prices WHERE close_price IS NULL").fetchone()[0]
 
-    # Export Silver to Parquet
-    con.execute(f"""
-        COPY silver_prices
-        TO '{silver_storage_path}'
-        (FORMAT PARQUET);
-    """)
+        NULL_THRESHOLD = 0.0 #adjustable
+    
+        if row_count > 0:
+            null_ratio = null_close / row_count
+            logger.info(f"runtime null ratio (close_price): {null_ratio:.6f}")
 
-    con.close()
+            if null_ratio > NULL_THRESHOLD:
+                logger.error("Null close_price detected at runtime.")
+                raise Exception("Runtime null violation")
+            
+        #Runtime volume anomaly check
+        if had_new_data:
 
-    logger.info("Silver layer materialized successfully.")
+            logger.info("Running runtime volume anomaly check...")
+
+            stats = con.execute("""SELECT AVG(volume), STDDEV(volume), MAX(volume) FROM silver_prices""").fetchone()
+
+            avg_vol, std_vol, max_vol = stats
+
+            if avg_vol is not None and std_vol is not None and std_vol > 0:
+                z_score = (max_vol - avg_vol) / std_vol
+
+                logger.info(f"Max volume z-score: {z_score:.2f}")
+
+                if z_score > 200:
+                    logger.error("Extreme volume anomaly detected.")
+                    raise Exception("Volume anomaly error")
+            
+                elif z_score > 50:
+                    logger.warning("High volume anomaly detected.")
+
+        # Remove previous Silver parquet
+        silver_storage_path = "storage/silver/prices.parquet"
+        if os.path.exists(silver_storage_path):
+            os.remove(silver_storage_path)
+
+        # Export Silver to Parquet
+        con.execute(f"""COPY silver_prices TO '{silver_storage_path}' (FORMAT PARQUET)""")
+
+        logger.info("Silver layer materialized successfully.")
+
+    finally:
+        con.close()
 
 
 def run_gold_transformations():
