@@ -24,7 +24,7 @@ def load_all_timestamps(base_path):
     return timestamps.sort_values().reset_index(drop=True)
 
 
-def basic_raw_checks(base_path, interval_ms):
+def basic_raw_checks(base_path, interval_ms, backfill_start=None):
     timestamps = load_all_timestamps(base_path)
 
     if timestamps.empty:

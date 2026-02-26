@@ -10,23 +10,51 @@ import os
 SYMBOL = "BTCUSDT"
 INTERVAL = "1h"
 
+
 logger = logging.getLogger(__name__)
 
 
-def run_ingestion():
+def run_ingestion(backfill_start=None):
 
     logger.info("Starting ingestion...")
 
-    if get_last_timestamp(SYMBOL, INTERVAL) is None:
-        bootstrap_start = datetime(2020, 1, 1)
-    else:
-        bootstrap_start = None
+    from ingestion.utils import get_partitions_from_date
 
-    df = fetch_klines(
-        symbol=SYMBOL,
-        interval=INTERVAL,
-        start_date=bootstrap_start
-    )
+    if backfill_start:
+        logger.info(f"Running backfill from: {backfill_start}")
+
+        start_dt = datetime.fromisoformat(backfill_start)
+        partitions = get_partitions_from_date(start_dt)
+
+        for year, month in partitions:
+            partition_path = Path(
+                f"storage/raw/source=binance/dataset=klines/"
+                f"symbol={SYMBOL}/interval={INTERVAL}/year={year}/month={month}"
+            )
+
+            if partition_path.exists():
+                for file in partition_path.glob("*.parquet"):
+                    file.unlink()
+                cleared_count += 1
+                logger.info(f"Cleared {cleared_count} partitions for backfill.")
+    
+        df = fetch_klines(
+            symbol=SYMBOL,
+            interval=INTERVAL,
+            start_date=start_dt
+        )
+
+    else:
+        if get_last_timestamp(SYMBOL, INTERVAL) is None:
+            bootstrap_start = datetime(2020, 1, 1)
+        else:
+            bootstrap_start = None
+        
+        df = fetch_klines(
+            symbol=SYMBOL,
+            interval=INTERVAL,
+            start_date=bootstrap_start
+        )
 
     new_rows = len(df)
     logger.info(f"New rows this run: {new_rows}")
@@ -75,11 +103,16 @@ def run_ingestion():
     if report["gaps"] > 0:
         logger.warning("Temporal gaps detected in raw data.")
         logger.warning(f"Missing candles: {report['missing_candles']}")
+
+    if backfill_start:
+        if report["gaps"] > 0:
+            logger.error("Backfill introduced historical gaps.")
+            raise Exception("Backfill continuity violation")
     
     return had_new_data
 
 
-def run_silver_transformations(had_new_data):
+def run_silver_transformations():
     
     logger.info("Materializing Silver layer...")
 
@@ -118,25 +151,23 @@ def run_silver_transformations(had_new_data):
                 raise Exception("Runtime null violation")
             
         #Runtime volume anomaly check
-        if had_new_data:
+        logger.info("Running runtime volume anomaly check...")
 
-            logger.info("Running runtime volume anomaly check...")
+        stats = con.execute("""SELECT AVG(volume), STDDEV(volume), MAX(volume) FROM silver_prices""").fetchone()
 
-            stats = con.execute("""SELECT AVG(volume), STDDEV(volume), MAX(volume) FROM silver_prices""").fetchone()
+        avg_vol, std_vol, max_vol = stats
 
-            avg_vol, std_vol, max_vol = stats
+        if avg_vol is not None and std_vol is not None and std_vol > 0:
+            z_score = (max_vol - avg_vol) / std_vol
 
-            if avg_vol is not None and std_vol is not None and std_vol > 0:
-                z_score = (max_vol - avg_vol) / std_vol
+            logger.info(f"Max volume z-score: {z_score:.2f}")
 
-                logger.info(f"Max volume z-score: {z_score:.2f}")
-
-                if z_score > 200:
-                    logger.error("Extreme volume anomaly detected.")
-                    raise Exception("Volume anomaly error")
+            if z_score > 200:
+                logger.error("Extreme volume anomaly detected.")
+                raise Exception("Volume anomaly error")
             
-                elif z_score > 50:
-                    logger.warning("High volume anomaly detected.")
+            elif z_score > 50:
+                logger.warning("High volume anomaly detected.")
 
         # Remove previous Silver parquet
         silver_storage_path = "storage/silver/prices.parquet"

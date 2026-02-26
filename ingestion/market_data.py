@@ -123,10 +123,9 @@ def save_raw(df, symbol="BTCUSDT", interval="1h"):
         base_path.mkdir(parents=True, exist_ok=True)
 
         group = group.drop(columns=["_open_time_dt", "_year", "_month"])
-
-        # nombre único por ejecución
+            
+        # Generate new file
         timestamp_str = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
-
         file_path = base_path / f"data_{timestamp_str}.parquet"
 
         group.to_parquet(file_path, index=False)

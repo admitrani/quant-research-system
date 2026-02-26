@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+import argparse
 import time
 
 LOG_DIR = Path("logs")
@@ -28,48 +29,65 @@ from orchestration.stages import (
 
 # Current execution mode: batch
 
-def run_pipeline():
+def run_pipeline(start_stage=None, backfill_start=None):
 
     logger.info("=" * 60)
     logger.info("Starting pipeline execution")
 
     pipeline_start = time.time()
 
+    stages = [
+        ("ingestion", run_ingestion),
+        ("silver", run_silver_transformations),
+        ("gold", run_gold_transformations),
+        ("model", run_model_stage)
+    ]
+
+    if start_stage:
+        stage_names = [name for name, _ in stages]
+        
+        if start_stage not in stage_names:
+            logger.error(f"Invalid stage specified: {start_stage}")
+            raise ValueError(f"Invalid stage: {start_stage}")
+        
+        if backfill_start and start_stage and start_stage != "ingestion":
+            logger.error("Backfill can only be used when starting from ingestion stage.")
+            raise ValueError("Invalid backfill usage")
+        
+        start_index = stage_names.index(start_stage)
+        stages = stages[start_index:]
+    
     try:
-        # Stage 1
-        stage_start = time.time()
-        logger.info("Stage 1: Ingestion")
-        had_new_data = run_ingestion()
-        logging.info(f"Stage 1 duration: {time.time() - stage_start:.2f}s")
+        for stage_name, stage_func in stages:
 
-        # Stage 2
-        stage_start = time.time()
-        logger.info("Stage 2: Silver transformations")
-        run_silver_transformations(had_new_data)
-        logging.info(f"Stage 2 duration: {time.time() - stage_start:.2f}s")
+            logger.info(f"Stage: {stage_name}")
+            stage_start = time.time()
 
-        # Stage 3
-        stage_start = time.time()
-        logger.info("Stage 3: Gold transformations")
-        run_gold_transformations()
-        logging.info(f"Stage 3 duration: {time.time() - stage_start:.2f}s")
+            if stage_name == "ingestion":
+                stage_func(backfill_start)
+            else:
+                stage_func()
 
-        # Stage 4
-        stage_start = time.time()
-        logger.info("Stage 4: Model stage")
-        run_model_stage()
-        logging.info(f"Stage 4 duration: {time.time() - stage_start:.2f}s")
+            duration = time.time() - stage_start
+            logger.info(f"Stage {stage_name} completed in {duration:.2f}s")
 
-        logger.info("Pipeline finished successfully.")
+        total_duration = time.time() - pipeline_start
+        logger.info(f"Pipeline finished successfully in {total_duration:.2f}s.")
 
-    except Exception as e:
-        logger.exception("Pipeline failed with error.")
+    except Exception:
+        logger.exception("Pipeline failed.")
         raise
 
     finally:
-        total_duration = time.time() - pipeline_start
-        logger.info(f"Total pipeline duration: {total_duration:.2f}s")
         logger.info("=" * 60)
 
 if __name__ == "__main__":
-    run_pipeline()
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--stage", type=str, help="Start execution from specific stage")
+    parser.add_argument("--backfill-start", type=str, help="Backfill start date (YYYY-MM-DD)")
+    
+    args = parser.parse_args()
+
+    run_pipeline(start_stage=args.stage, backfill_start=args.backfill_start)
