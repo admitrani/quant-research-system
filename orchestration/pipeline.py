@@ -29,7 +29,7 @@ from orchestration.stages import (
 
 # Current execution mode: batch
 
-def run_pipeline(start_stage=None, backfill_start=None):
+def run_pipeline(start_stage=None, backfill=False, reprocess_start=None, reprocess_end=None):
 
     logger.info("=" * 60)
     logger.info("Starting pipeline execution")
@@ -50,10 +50,6 @@ def run_pipeline(start_stage=None, backfill_start=None):
             logger.error(f"Invalid stage specified: {start_stage}")
             raise ValueError(f"Invalid stage: {start_stage}")
         
-        if backfill_start and start_stage and start_stage != "ingestion":
-            logger.error("Backfill can only be used when starting from ingestion stage.")
-            raise ValueError("Invalid backfill usage")
-        
         start_index = stage_names.index(start_stage)
         stages = stages[start_index:]
     
@@ -64,7 +60,7 @@ def run_pipeline(start_stage=None, backfill_start=None):
             stage_start = time.time()
 
             if stage_name == "ingestion":
-                stage_func(backfill_start)
+                stage_func(backfill=backfill, reprocess_start=reprocess_start, reprocess_end=reprocess_end)
             else:
                 stage_func()
 
@@ -84,10 +80,11 @@ def run_pipeline(start_stage=None, backfill_start=None):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-
     parser.add_argument("--stage", type=str, help="Start execution from specific stage")
-    parser.add_argument("--backfill-start", type=str, help="Backfill start date (YYYY-MM-DD)")
+    parser.add_argument("--backfill", action="store_true", help="Run gap backfill after ingestion")
+    parser.add_argument("--reprocess-start", type=str, help="Reprocess start date YYYY-MM-DD")
+    parser.add_argument("--reprocess-end", type=str, help="Reprocess end date YYYY-MM-DD")
     
     args = parser.parse_args()
 
-    run_pipeline(start_stage=args.stage, backfill_start=args.backfill_start)
+    run_pipeline(start_stage=args.stage, backfill=args.backfill, reprocess_start=args.reprocess_start, reprocess_end=args.reprocess_end)

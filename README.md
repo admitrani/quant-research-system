@@ -2,88 +2,145 @@
 
 ## 🎯 Objective
 
-This project aims to build a production-ready data engineering system for financial market data ingestion, transformation, and feature generation.
+This project builds a production-grade data engineering system
+for financial market data ingestion, transformation, and recovery.
 
 The long-term goal is to support quantitative trading strategies
-with a robust, scalable, and reproducible data pipeline.
+with a robust, scalable, reproducible, and fault-tolerant pipeline.
 
 This repository focuses on:
 
-- Reliable data ingestion from APIs
-- Layered data architecture (Medallion)
-- SQL-based transformations
-- Data quality validation
-- Pipeline orchestration
-- Reproducibility and modular design
+- Reliable incremental ingestion from APIs
+- Medallion architecture (Bronze / Silver / Gold)
+- SQL-based transformations (DuckDB)
+- Runtime data quality validation
+- Gap detection and automatic backfill
+- Controlled historical reprocessing
+- DAG-based orchestration
+- Idempotent execution guarantees
 
 ---
 
 ## 🏗 Architecture Overview
 
-The system follows a **Medallion Architecture**:
+The system follows a **Medallion Architecture** with operational safeguards.
 
-### 🥉 Bronze Layer (Raw)
+### 🥉 Bronze (Raw Data Lake)
 
-- Immutable raw data
+- Immutable storage
+- Append-only (incremental mode)
+- Partitioned by year/month
 - Stored exactly as received from source
-- No transformations
-- Used for traceability and reprocessing
+- Source of truth
+- Supports:
+  - Incremental loading
+  - Gap detection
+  - Surgical backfill
+  - Range reprocessing
 
-### 🥈 Silver Layer (Cleaned)
+### 🥈 Silver (Clean Layer)
 
-- Cleaned and standardized data
+- Structured and typed schema
 - Deduplicated
-- Typed and validated
-- Structured for analytical use
+- Ordered and validated
+- Runtime data integrity checks
+- Analytical-ready dataset
+- Exported to Parquet + materialized in DuckDB
 
-### 🥇 Gold Layer (Curated)
+### 🥇 Gold (Curated Layer)
 
-- Business-ready datasets
-- Aggregated features
-- Strategy-ready signals
+- Strategy-ready datasets
+- Feature engineering layer
+- Aggregated / ML-ready tables
+- Built on top of validated Silver data
 
 ---
 
-## 🔁 Pipeline Flow
+## 🔁 Pipeline Execution Modes
 
-Ingestion → Raw Storage → Cleaning → Transformation → Feature Engineering
+The pipeline supports multiple controlled execution paths:
 
-The system is designed to be:
+### 1️⃣ Incremental Mode (Default)
 
+Fetches only new candles using watermark logic.
+
+python -m orchestration.pipeline --stage ingestion
+
+---
+
+### 2️⃣ Gap Backfill Mode
+
+Detects historical gaps and fills only missing candles.
+
+python -m orchestration.pipeline --stage ingestion --backfill
+
+Characteristics:
+- No full reload
+- No duplication
+- Re-validates after repair
 - Idempotent
-- Reproducible
-- Modular
-- Extendable
+
+---
+
+### 3️⃣ Range Reprocessing Mode
+
+Rewrites a specific historical window without affecting other data.
+
+python -m orchestration.pipeline
+--stage ingestion
+--reprocess-start YYYY-MM-DD
+--reprocess-end YYYY-MM-DD
+
+Characteristics:
+- Rewrites only affected rows
+- Does not drop full partitions
+- Preserves data outside range
+- Fully controlled recovery
+
+---
+
+## 🧪 Data Quality & Validation
+
+Runtime validation includes:
+
+- Schema validation (Silver layer)
+- Duplicate detection
+- Null checks
+- Range validation
+- Ordering validation
+- Temporal gap detection
+- Volume anomaly detection (z-score)
+- Post-backfill revalidation
+
+The system is designed to fail fast on structural violations.
+
+---
+
+## 🧠 Design Principles
+
+- Idempotent execution
+- Deterministic transformations
+- Recovery-first architecture
+- Separation of raw vs transformed logic
+- No silent failures
+- Layered responsibility
+- Append-only raw storage
+
+---
+
+## 📊 Execution Flow
+
+API → Incremental Load → Raw Lake → Validation  
+→ Silver Transformation → Runtime Checks → Export  
+→ Gold (future feature layer)
 
 ---
 
 ## 🚀 Future Extensions
 
-- SQL-based transformation engine
-- Orchestration with DAG logic
-- Data quality monitoring
-- ML integration
-- Cloud deployment
-
----
-
-## 📊 Pipeline Diagram
-
-            ┌──────────────┐
-            │   API Data   │
-            └───────┬──────┘
-                    │
-                    ▼
-            ┌──────────────┐
-            │  Bronze Raw  │
-            └───────┬──────┘
-                    │
-                    ▼
-            ┌──────────────┐
-            │  Silver Clean│
-            └───────┬──────┘
-                    │
-                    ▼
-            ┌──────────────┐
-            │  Gold Curated│
-            └──────────────┘
+- ML feature store integration
+- Live event-driven ingestion
+- Metadata tracking table (run history)
+- Cloud storage migration
+- Orchestrator migration (Airflow/Prefect)
+- Distributed compute support

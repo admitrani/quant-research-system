@@ -1,36 +1,150 @@
-Raw layer behaves as Data Lake (append-only, file-based storage).
+# System Architecture
 
-Silver/Gold simulate analytical warehouse layers.
+## 1. Storage Strategy
 
-Future upgrade path: migrate Silver/Gold to SQL engine (DuckDB/Postgres/Cloud warehouse).
+Raw layer behaves as a Data Lake (file-based, append-only).
 
-System analytical mode: OLAP-first.
-Operational layer (future execution) may require OLTP.
+Silver/Gold simulate analytical warehouse layers using DuckDB.
 
-Storage format: Columnar (Parquet)
-Reason: OLAP-oriented workload (feature engineering, ML training, historical backtesting).
+Current mode: Batch-first, OLAP-oriented.
 
-File format standard: Parquet
-Reason: Columnar storage, compression efficiency, OLAP performance, ML compatibility.
-CSV allowed only for debugging or export.
+---
 
-Partitioning strategy:
-- Primary partition key: year/month
-- Optional clustering key: symbol
-Reason: Time-series workload with window-based backtesting.
+## 2. File Format
 
-Data modeling approach:
-- Silver: structured fact/dimension separation.
-- Gold: analytical denormalized datasets for ML.
-- Primary key for prices: (asset_id, timestamp).
+Storage format: Parquet  
+Reason:
 
-Future consideration:
-- Event-driven ingestion for live execution layer.
-- CDC patterns for operational systems.
-Current architecture: Batch-first.
+- Columnar compression
+- Efficient OLAP scans
+- ML compatibility
+- Backtesting performance
 
-Raw layer rules:
-- Immutable
-- Append-only
-- Partitioned by year/month
-- No transformations allowed
+CSV allowed only for debugging.
+
+---
+
+## 3. Partitioning Strategy
+
+Primary partition key:
+- year
+- month
+
+Reason:
+- Time-series workload
+- Window-based backtesting
+- Controlled historical rewriting
+
+---
+
+## 4. Ingestion Modes
+
+### Incremental
+
+- Uses watermark (max open_time from raw)
+- Fetches only new data
+- Append-only write
+
+### Gap Backfill
+
+- Detects temporal gaps
+- Fetches only missing ranges
+- Preserves existing data
+- Re-validates after repair
+
+### Range Reprocess
+
+- Rewrites only rows inside specified window
+- Does NOT drop full partitions
+- Preserves out-of-range data
+- Controlled historical recovery
+
+---
+
+## 5. Data Guarantees
+
+The system guarantees:
+
+- No duplication at Silver layer
+- Deterministic transformations
+- Idempotent incremental runs
+- Recovery convergence
+- No silent corruption
+
+Raw is treated as:
+
+- Source of truth
+- Immutable in incremental mode
+- Rewrite-only under explicit reprocess
+
+---
+
+## 6. Validation Strategy
+
+### Raw Validation
+
+- Duplicate detection
+- Sorted check
+- Gap detection
+- Missing candle count
+
+### Silver Validation
+
+- Schema validation
+- Null checks
+- Price/volume sanity rules
+- Order validation
+- Runtime anomaly detection
+
+System is designed to fail fast on structural violations.
+
+---
+
+## 7. Orchestration Model
+
+Pipeline execution is stage-based:
+
+- ingestion
+- silver
+- gold
+- model
+
+Supports:
+
+- Partial stage execution
+- Controlled backfill
+- Controlled reprocess
+- Runtime logging
+
+DAG execution order:
+
+ingestion → silver → gold → model
+
+---
+
+## 8. Recovery Model
+
+There are three recovery levels:
+
+1. Retry (transient failures)
+2. Gap backfill (partial historical loss)
+3. Range reprocess (structural correction)
+
+This layered recovery model prevents:
+
+- Full reload necessity
+- Historical corruption
+- Cascade failures
+
+---
+
+## 9. Upgrade Path
+
+Future improvements:
+
+- Metadata tracking table (run registry)
+- Live ingestion mode
+- Cloud object storage
+- Distributed compute
+- Data contracts
+- Observability dashboard

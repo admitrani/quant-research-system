@@ -1,5 +1,5 @@
 from datetime import datetime
-from ingestion.market_data import fetch_klines, save_raw, get_last_timestamp
+from ingestion.market_data import fetch_klines, save_raw, get_last_timestamp, interval_to_milliseconds
 from ingestion.audit import basic_raw_checks
 from pathlib import Path
 import logging
@@ -14,47 +14,34 @@ INTERVAL = "1h"
 logger = logging.getLogger(__name__)
 
 
-def run_ingestion(backfill_start=None):
+def run_ingestion(backfill=False, reprocess_start=None, reprocess_end=None):
 
     logger.info("Starting ingestion...")
 
-    from ingestion.utils import get_partitions_from_date
+    if reprocess_start and reprocess_end:
+        logger.info(f"Reprocessing range: {reprocess_start} -> {reprocess_end}")
+        from ingestion.reprocess import run_range_reprocess
 
-    if backfill_start:
-        logger.info(f"Running backfill from: {backfill_start}")
-
-        start_dt = datetime.fromisoformat(backfill_start)
-        partitions = get_partitions_from_date(start_dt)
-
-        for year, month in partitions:
-            partition_path = Path(
-                f"storage/raw/source=binance/dataset=klines/"
-                f"symbol={SYMBOL}/interval={INTERVAL}/year={year}/month={month}"
-            )
-
-            if partition_path.exists():
-                for file in partition_path.glob("*.parquet"):
-                    file.unlink()
-                cleared_count += 1
-                logger.info(f"Cleared {cleared_count} partitions for backfill.")
-    
-        df = fetch_klines(
-            symbol=SYMBOL,
-            interval=INTERVAL,
-            start_date=start_dt
+        inserted = run_range_reprocess(
+            SYMBOL,
+            INTERVAL,
+            reprocess_start,
+            reprocess_end
         )
 
+        logger.info(f"Reprocess inserted {inserted} candles.")
+        return True
+
+    if get_last_timestamp(SYMBOL, INTERVAL) is None:
+        bootstrap_start = datetime(2020, 1, 1)
     else:
-        if get_last_timestamp(SYMBOL, INTERVAL) is None:
-            bootstrap_start = datetime(2020, 1, 1)
-        else:
-            bootstrap_start = None
+        bootstrap_start = None
         
-        df = fetch_klines(
-            symbol=SYMBOL,
-            interval=INTERVAL,
-            start_date=bootstrap_start
-        )
+    df = fetch_klines(
+        symbol=SYMBOL,
+        interval=INTERVAL,
+        start_date=bootstrap_start
+    )
 
     new_rows = len(df)
     logger.info(f"New rows this run: {new_rows}")
@@ -85,7 +72,7 @@ def run_ingestion(backfill_start=None):
         f"symbol={SYMBOL}/interval={INTERVAL}"
     )
 
-    interval_ms = 3600000
+    interval_ms = interval_to_milliseconds(INTERVAL)
 
     report = basic_raw_checks(base_path, interval_ms)
     
@@ -104,10 +91,22 @@ def run_ingestion(backfill_start=None):
         logger.warning("Temporal gaps detected in raw data.")
         logger.warning(f"Missing candles: {report['missing_candles']}")
 
-    if backfill_start:
+    if backfill:
+        logger.info("Auto gap backfill enabled.")
+
         if report["gaps"] > 0:
-            logger.error("Backfill introduced historical gaps.")
-            raise Exception("Backfill continuity violation")
+            from ingestion.backfill import run_gap_backfill
+            logger.info(f"Gaps detected before backfill: {report['gaps']}")
+            
+            inserted = run_gap_backfill(SYMBOL, INTERVAL)
+            logger.info(f"Candles inserted by backfill: {inserted}")
+            logger.info("Re-validating gaps after backfill...")
+
+            report = basic_raw_checks(base_path, interval_ms)
+            logger.info(f"Gaps after backfill: {report['gaps']}")
+            logger.info(f"Missing candles after backfill: {report['missing_candles']}")
+        else:
+            logger.info("No gaps detected. Backfill skipped.")
     
     return had_new_data
 

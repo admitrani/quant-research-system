@@ -2,9 +2,32 @@ from datetime import datetime, timedelta
 import pandas as pd
 from pathlib import Path
 from ingestion.api_client import APIClient
+import logging
 
 BASE_URL = "https://api.binance.com"
 
+logger = logging.getLogger(__name__)
+
+INTERVAL_TO_MS = {
+    "1m": 60_000,
+    "3m": 180_000,
+    "5m": 300_000,
+    "15m": 900_000,
+    "30m": 1_800_000,
+    "1h": 3_600_000,
+    "2h": 7_200_000,
+    "4h": 14_400_000,
+    "6h": 21_600_000,
+    "8h": 28_800_000,
+    "12h": 43_200_000,
+    "1d": 86_400_000,
+}
+
+def interval_to_milliseconds(interval):
+    if interval not in INTERVAL_TO_MS:
+        logger.error(f"Unsupported interval: {interval}")
+        raise ValueError(f"Unsupported interval: {interval}")
+    return INTERVAL_TO_MS[interval]
 
 # GET LAST TIMESTAMP (Watermark real desde Raw)
 
@@ -41,14 +64,14 @@ def fetch_klines(
     symbol="BTCUSDT",
     interval="1h",
     days=30,
-    start_date=None
+    start_date=None,
+    end_time_ms=None
 ):
 
     client = APIClient(BASE_URL)
 
-    interval_ms = 3600000  # 1h
+    interval_ms = interval_to_milliseconds(interval)
     limit = 1000
-    end_time = int(datetime.utcnow().timestamp() * 1000)
     last_ts = get_last_timestamp(symbol, interval)
 
     # Determinar start_time
@@ -77,6 +100,9 @@ def fetch_klines(
             "limit": limit
         }
 
+        if end_time_ms:
+            params["endTime"] = end_time_ms
+
         data = client.get("/api/v3/klines", params=params)
 
         if not data:
@@ -85,6 +111,9 @@ def fetch_klines(
         all_data.extend(data)
 
         last_open_time = data[-1][0]
+
+        if end_time_ms and last_open_time >= end_time_ms:
+            break
 
         start_time = last_open_time + interval_ms
 
