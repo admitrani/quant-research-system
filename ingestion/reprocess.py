@@ -8,10 +8,10 @@ from ingestion.market_data import fetch_klines, save_raw, interval_to_millisecon
 logger = logging.getLogger(__name__)
 
 
-def run_range_reprocess(symbol, interval, start_date_str, end_date_str):
+def run_range_reprocess(symbol, interval, start_date, end_date):
 
-    start_dt = datetime.fromisoformat(start_date_str).replace(tzinfo=timezone.utc)
-    end_dt = datetime.fromisoformat(end_date_str).replace(tzinfo=timezone.utc)
+    start_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+    end_dt = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
 
     interval_ms = interval_to_milliseconds(interval)
 
