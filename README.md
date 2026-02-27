@@ -136,6 +136,19 @@ API → Incremental Load → Raw Lake → Validation
 
 ---
 
+## 🔄 Development Workflow
+
+This repository follows a feature-branch workflow:
+
+- main: production-ready code
+- dev: integration branch
+- feature/*: isolated development branches
+
+All new features are developed in feature branches
+and merged into dev before reaching main.
+
+---
+
 ## 🚀 Future Extensions
 
 - ML feature store integration
