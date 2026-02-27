@@ -141,11 +141,10 @@ API → Incremental Load → Raw Lake → Validation
 This repository follows a feature-branch workflow:
 
 - main: production-ready code
-- dev: integration branch
 - feature/*: isolated development branches
 
 All new features are developed in feature branches
-and merged into dev before reaching main.
+and merged into main.
 
 ---
 
