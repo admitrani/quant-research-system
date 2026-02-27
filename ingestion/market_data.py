@@ -29,7 +29,7 @@ def interval_to_milliseconds(interval):
         raise ValueError(f"Unsupported interval: {interval}")
     return INTERVAL_TO_MS[interval]
 
-# GET LAST TIMESTAMP (Watermark real desde Raw)
+# GET LAST TIMESTAMP (Watermark from Raw)
 
 def get_last_timestamp(symbol="BTCUSDT", interval="1h"):
 
