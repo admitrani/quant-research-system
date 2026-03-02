@@ -35,17 +35,9 @@ deduplicated AS (
     WHERE rn = 1
 )
 
-SELECT
-    open_time,
-    open_price,
-    high_price,
-    low_price,
-    close_price,
-    volume,
-    close_time,
-    quote_asset_volume,
-    number_of_trades,
-    taker_buy_base_volume,
-    taker_buy_quote_volume,
-    open_time_utc
-FROM deduplicated;
+SELECT *
+FROM deduplicated
+WHERE open_time <= (
+    SELECT MAX(open_time) - 3600000
+    FROM deduplicated
+)
