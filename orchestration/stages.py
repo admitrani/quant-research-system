@@ -1,14 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from ingestion.market_data import fetch_klines, save_raw, get_last_timestamp, interval_to_milliseconds
 from ingestion.audit import basic_raw_checks
+from config.config_loader import load_config
 from pathlib import Path
 import logging
 import duckdb
 import os
-
-
-SYMBOL = "BTCUSDT"
-INTERVAL = "1h"
 
 
 logger = logging.getLogger(__name__)
@@ -18,13 +15,21 @@ def run_ingestion(backfill=False, reprocess_start=None, reprocess_end=None):
 
     logger.info("Starting ingestion...")
 
+    config = load_config()
+
+    symbol = config["market_data"]["symbols"][0]
+    interval = config["market_data"]["intervals"][0]
+    historical_start_str = config["market_data"]["historical_start"]
+
+    historical_start = datetime.fromisoformat(historical_start_str).replace(tzinfo=timezone.utc)
+
     if reprocess_start and reprocess_end:
         logger.info(f"Reprocessing range: {reprocess_start} -> {reprocess_end}")
         from ingestion.reprocess import run_range_reprocess
 
         inserted = run_range_reprocess(
-            SYMBOL,
-            INTERVAL,
+            symbol,
+            interval,
             reprocess_start,
             reprocess_end
         )
@@ -32,14 +37,12 @@ def run_ingestion(backfill=False, reprocess_start=None, reprocess_end=None):
         logger.info(f"Reprocess inserted {inserted} candles.")
         return True
 
-    if get_last_timestamp(SYMBOL, INTERVAL) is None:
-        bootstrap_start = datetime(2020, 1, 1)
-    else:
-        bootstrap_start = None
+    last_ts = get_last_timestamp(symbol, interval)
+    bootstrap_start = historical_start if last_ts is None else None
         
     df = fetch_klines(
-        symbol=SYMBOL,
-        interval=INTERVAL,
+        symbol=symbol,
+        interval=interval,
         start_date=bootstrap_start
     )
 
@@ -64,15 +67,15 @@ def run_ingestion(backfill=False, reprocess_start=None, reprocess_end=None):
     if new_rows == 0:
         logger.info("Nothing to ingest.")
     else:
-        save_raw(df, symbol=SYMBOL, interval=INTERVAL)
+        save_raw(df, symbol=symbol, interval=interval)
         logger.info(f"Ingested {len(df)} candles.")
 
     base_path = Path(
         f"storage/raw/source=binance/dataset=klines/"
-        f"symbol={SYMBOL}/interval={INTERVAL}"
+        f"symbol={symbol}/interval={interval}"
     )
 
-    interval_ms = interval_to_milliseconds(INTERVAL)
+    interval_ms = interval_to_milliseconds(interval)
 
     report = basic_raw_checks(base_path, interval_ms)
     
@@ -98,7 +101,7 @@ def run_ingestion(backfill=False, reprocess_start=None, reprocess_end=None):
             from ingestion.backfill import run_gap_backfill
             logger.info(f"Gaps detected before backfill: {report['gaps']}")
             
-            inserted = run_gap_backfill(SYMBOL, INTERVAL)
+            inserted = run_gap_backfill(symbol, interval)
             logger.info(f"Candles inserted by backfill: {inserted}")
             logger.info("Re-validating gaps after backfill...")
 
