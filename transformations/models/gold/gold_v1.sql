@@ -8,7 +8,7 @@ returns AS (
     SELECT
         *,
         -- 1H return
-        (close_price / LAG(close_price) OVER (ORDER BY open_time) - 1) 
+        (close_price / LAG(close_price) OVER (ORDER BY open_time_utc) - 1) 
             AS return_1h
 
     FROM base
@@ -20,33 +20,33 @@ rolling_features AS (
         *,
         
         -- 3H rolling return
-        (close_price / LAG(close_price, 3) OVER (ORDER BY open_time) - 1)
+        (close_price / LAG(close_price, 3) OVER (ORDER BY open_time_utc) - 1)
             AS return_3h,
 
         -- 12H rolling return
-        (close_price / LAG(close_price, 12) OVER (ORDER BY open_time) - 1)
+        (close_price / LAG(close_price, 12) OVER (ORDER BY open_time_utc) - 1)
             AS return_12h,
 
         -- 12H rolling volatility (std of 1H returns)
         STDDEV(return_1h) OVER (
-            ORDER BY open_time
+            ORDER BY open_time_utc
             ROWS BETWEEN 11 PRECEDING AND CURRENT ROW
         ) AS volatility_12h,
 
         -- MA20
         AVG(close_price) OVER (
-            ORDER BY open_time
+            ORDER BY open_time_utc
             ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
         ) AS ma20,
 
         -- Volume mean and std for z-score
         AVG(volume) OVER (
-            ORDER BY open_time
+            ORDER BY open_time_utc
             ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
         ) AS volume_mean_20,
 
         STDDEV(volume) OVER (
-            ORDER BY open_time
+            ORDER BY open_time_utc
             ROWS BETWEEN 19 PRECEDING AND CURRENT ROW
         ) AS volume_std_20
 
@@ -76,7 +76,7 @@ target AS (
     SELECT
         *,
         
-        (LEAD(close_price, 3) OVER (ORDER BY open_time) / close_price - 1)
+        (LEAD(close_price, 3) OVER (ORDER BY open_time_utc) / close_price - 1)
             AS future_return
 
     FROM features
@@ -108,7 +108,6 @@ cleaned AS (
 )
 
 SELECT
-    open_time,
     open_time_utc,
 
     open_price,
@@ -128,4 +127,4 @@ SELECT
     label
 
 FROM cleaned
-ORDER BY open_time;
+ORDER BY open_time_utc;
