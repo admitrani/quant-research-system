@@ -18,7 +18,7 @@ The objective of this freeze is to ensure:
 - **Symbol:** BTCUSDT  
 - **Interval:** 1H  
 - **Data Source:** Binance API  
-- **Range:** 2019-01-01 → latest available at freeze date  
+- **Range:** 2019-01-01 → 2026-03-03
 - **Pipeline Mode:** Full rebuild (non-incremental)  
 
 This dataset replaces any previous historical ingestion starting from 2020.
@@ -29,7 +29,7 @@ This dataset replaces any previous historical ingestion starting from 2020.
 
 | Metric                        | Value      |
 |------------------------------|------------|
-| Total candles                | 62,757     |
+| Total candles                | 62,780     |
 | Duplicates                   | 0          |
 | Sorted (monotonic timestamps)| True       |
 | Gaps detected                | 20         |
