@@ -79,6 +79,7 @@ Extracted from TradeAnalyzer:
 - Calmar: 0.077
 - Profit Factor: 1.04
 - Trades: 308
+- Exposure: 89%
 
 ---
 
@@ -101,3 +102,27 @@ This baseline corresponds to:
 - EMA parameters (10,20)
 
 Any modification requires version increment.
+
+---
+
+## Buy & Hold Strategy
+
+- Identical dataset
+- Identical cost model
+- Identical initial capital
+- Identical time horizon
+
+### Results
+
+- Final value: 1780962
+- CAGR: 49,4%
+- Sharpe: 0.96
+- Max Drawdown: 77.06%
+- Calmar: 0.64
+- Exposure: 100%
+
+### Conclusion
+
+EMA crossover does not outperform Buy & Hold under realistic costs.
+
+Buy & Hold becomes the primary benchmark for ML comparison.
