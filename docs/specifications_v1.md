@@ -250,3 +250,71 @@ Versioning Rules:
 - Gold versions must be traceable to a specific Git tag.
 
 This guarantees full experimental reproducibility.
+
+---
+
+## Gold v1 Implementation Summary
+
+### SQL Model
+
+Gold v1 is implemented in:
+
+transformations/models/gold/gold_v1.sql
+
+The model is structured in logical CTE blocks:
+
+- Base
+- Returns
+- Rolling Features
+- Feature Engineering
+- Target Construction
+- Labeling
+- Edge Cleaning
+
+This ensures full transparency and auditability.
+
+---
+
+### Pipeline Integration
+
+Gold materialization is handled in:
+
+orchestration/stages.py
+
+The pipeline:
+
+1. Drops previous gold_v1 table
+2. Materializes from SQL model
+3. Validates non-empty output
+4. Exports to:
+
+storage/gold/btcusdt_1h_v1.parquet
+
+---
+
+### Edge Policy Enforcement
+
+Rows are removed if:
+
+- Any feature is NULL
+- `future_return` is NULL
+
+No forward fill, interpolation or synthetic data insertion is applied.
+
+---
+
+### Integrity Testing
+
+Gold v1 integrity is validated through:
+
+tests/test_gold_v1.py
+
+The test ensures:
+
+- File existence
+- No NULL values
+- No duplicate timestamps
+- Strict temporal ordering
+- Non-empty dataset
+
+This test is executed in CI.

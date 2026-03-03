@@ -100,7 +100,7 @@ This level of discontinuity is considered acceptable for professional quantitati
 
 This dataset is officially frozen as:
 
-> RAW BTCUSDT 1H — 4.8 v1 Baseline Dataset
+> RAW BTCUSDT 1H — v1 Baseline Dataset
 
 Any modification to:
 - Historical range
