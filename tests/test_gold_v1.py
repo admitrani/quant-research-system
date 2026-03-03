@@ -18,6 +18,21 @@ def test_gold_v1_integrity():
             SELECT * FROM read_parquet('{gold_path}')
         """)
 
+        # Basic schema validation
+        columns = con.execute("PRAGMA table_info('gold_v1_test')").fetchall()
+        column_names = [col[1] for col in columns]
+
+        required_ohlc = [
+            "open_price",
+            "high_price",
+            "low_price",
+            "close_price",
+            "volume"
+        ]
+
+        for col in required_ohlc:
+            assert col in column_names, f"Missing column {col} in Gold v1."
+
         # No NULL values in critical columns
         null_check = con.execute("""
             SELECT

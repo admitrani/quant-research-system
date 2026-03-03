@@ -6,11 +6,7 @@ WITH base AS (
 -- Basic returns
 returns AS (
     SELECT
-        open_time,
-        open_time_utc,
-        close_price,
-        volume,
-
+        *,
         -- 1H return
         (close_price / LAG(close_price) OVER (ORDER BY open_time) - 1) 
             AS return_1h
@@ -114,7 +110,12 @@ cleaned AS (
 SELECT
     open_time,
     open_time_utc,
+
+    open_price,
+    high_price,
+    low_price,
     close_price,
+    volume,
 
     return_1h,
     return_3h,

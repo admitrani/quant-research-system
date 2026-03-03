@@ -328,3 +328,18 @@ Raw Row Count: 62780
 Gold Row Count: 62764
 Git Tag: 4.8.2_gold_v1
 Config File: config/v1.yaml
+
+---
+
+## Gold Structure
+
+Gold v1 contains:
+
+- OHLCV
+- Engineered features
+- Continuous target
+- Binary label
+
+To use the same dataset for:
+- Baseline backtesting
+- ML modeling
