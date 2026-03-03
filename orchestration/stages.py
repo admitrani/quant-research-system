@@ -216,9 +216,9 @@ def run_gold_transformations():
 
         file_path = gold_storage_path / "btcusdt_1h_v1.parquet"
 
-        # Overwrite only if not existing (safety)
         if file_path.exists():
-            logger.warning("Gold v1 parquet already exists. Overwriting...")
+            logger.error("Gold v1 parquet already exists.")
+            raise Exception("Gold version is immutable")
         
         # Export to Parquet
         con.execute(f"COPY gold_v1 TO '{file_path}' (FORMAT PARQUET)")

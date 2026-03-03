@@ -13,7 +13,7 @@ This version (v1) is designed as a structural validation experiment before any m
 - **Asset:** BTCUSDT  
 - **Timeframe:** 1H  
 - **Data Source:** Binance API  
-- **Historical Range:** 2019-01-01 → latest available at freeze date  
+- **Historical Range:** 2019-01-01 → 2026-03-03
 - **Execution Target:** Interactive Brokers (IBKR)
 
 This version intentionally restricts the universe to a single asset and timeframe to avoid structural data snooping.
@@ -212,7 +212,7 @@ Gold v1 applies strict edge handling to avoid leakage.
 
 Rows lacking sufficient rolling history are removed.
 
-No partial rolling windows are allowed.
+Rows with incomplete rolling windows are removed.
 
 ### Final Rows
 
@@ -247,7 +247,7 @@ Versioning Rules:
 - The file is never overwritten.
 - Structural changes require version increment.
 - Each dataset version corresponds to a frozen configuration.
-- Gold versions must be traceable to a specific Git tag.
+- Gold v1 corresponds to Git tag: 4.8.2_gold_v1
 
 This guarantees full experimental reproducibility.
 
@@ -318,3 +318,13 @@ The test ensures:
 - Non-empty dataset
 
 This test is executed in CI.
+
+---
+
+## Freeze Metadata
+
+Freeze Timestamp (UTC): 2026-03-03 08:00
+Raw Row Count: 62780
+Gold Row Count: 62764
+Git Tag: 4.8.2_gold_v1
+Config File: config/v1.yaml
