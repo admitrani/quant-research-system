@@ -87,10 +87,166 @@ Any modification requires explicit version increment.
 
 This document formalizes the structural configuration of:
 
-> 4.8 v1 — Structural ML Validation (Single Asset)
+> v1 — Structural ML Validation (Single Asset)
 
 Future iterations:
 - v2 → Generalization (multi-asset)
 - v3 → New hypothesis (e.g., Long/Short, regression, regime modeling)
 
 ---
+
+## Gold Layer Implementation Decision
+
+Gold v1 is implemented entirely in SQL (DuckDB).
+
+Rationale:
+
+- Deterministic and reproducible transformations.
+- Clear separation between data engineering and modeling layers.
+- Alignment with project architecture.
+- Avoidance of notebook-driven data mutation.
+- Reduced risk of temporal leakage through explicit window functions.
+
+Python is reserved exclusively for modeling stages.
+
+---
+
+## Feature Selection Rationale (v1)
+
+Gold v1 intentionally uses a minimal structural feature set.
+
+### Hypothesis Being Tested
+
+The objective of v1 is to validate whether basic price and volatility dynamics contain exploitable predictive information at a 3-hour horizon under realistic trading costs.
+
+This version does NOT attempt feature maximization.
+
+---
+
+## Feature Set (v1)
+
+The following features are included:
+
+1. 1H return  
+2. 3H rolling return  
+3. 12H rolling return  
+4. 12H rolling volatility  
+5. Distance to MA20  
+6. 20H volume z-score  
+
+---
+
+## Rationale Per Feature
+
+### 1H Return
+Captures immediate short-term price dynamics.
+
+### 3H Return
+Aligned with label horizon (t+3). Ensures structural coherence.
+
+### 12H Return
+Provides medium-scale momentum context.
+
+### 12H Volatility
+Captures regime dependency of predictability.
+
+### MA20 Distance
+Measures structural deviation from local mean.
+
+### Volume Z-Score
+Captures abnormal participation levels.
+
+---
+
+## Excluded Features
+
+The following feature groups are intentionally excluded in v1:
+
+- RSI, MACD and derivative oscillators
+- Calendar effects
+- Intraday session indicators
+- Regime clustering features
+- Nonlinear technical composites
+
+Each excluded group represents a separate hypothesis and will be evaluated in later versions (v3+).
+
+---
+
+## Versioning Policy
+
+Any addition of new features requires version increment.
+
+---
+
+## Target Storage Policy
+
+Gold v1 stores both:
+
+- `future_return` (continuous target)
+- `label` (binary classification target)
+
+`future_return` is computed as:
+
+future_return(t) = Close(t+3) / Close(t) - 1
+
+The binary label is derived from it:
+
+label(t) = 1 if future_return > 0 else 0
+
+Rationale:
+
+- Preserve magnitude information.
+- Enable threshold sensitivity analysis.
+- Allow future regression modeling without rebuilding Gold.
+- Improve diagnostic transparency.
+
+`future_return` is never used as an input feature.
+
+---
+
+## Edge Handling Policy
+
+Gold v1 applies strict edge handling to avoid leakage.
+
+### Initial Rows
+
+Rows lacking sufficient rolling history are removed.
+
+No partial rolling windows are allowed.
+
+### Final Rows
+
+Rows where `future_return` is NULL (insufficient forward horizon) are removed.
+
+### Missing Historical Data
+
+Exchange-level historical gaps (<0.1%) are preserved.
+
+No forward fill, back fill or interpolation is applied.
+
+### General Rule
+
+Gold contains only rows with:
+
+- Fully defined features
+- Fully defined target
+- No synthetic data
+
+---
+
+## Physical Dataset Versioning
+
+Gold datasets are immutable.
+
+Gold v1 is stored as:
+
+storage/gold/btcusdt_1h_v1.parquet
+
+Versioning Rules:
+
+- The file is never overwritten.
+- Structural changes require version increment.
+- Each dataset version corresponds to a frozen configuration.
+- Gold versions must be traceable to a specific Git tag.
+
+This guarantees full experimental reproducibility.

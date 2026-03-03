@@ -186,7 +186,47 @@ def run_silver_transformations():
 
 
 def run_gold_transformations():
-    pass
+    
+    logger.info("Materializing Gold v1 layer...")
+    
+    con = duckdb.connect("warehouse.duckdb")
+    
+    try:
+        # Drop previous table if exists
+        con.execute("DROP TABLE IF EXISTS gold_v1")
+
+        # Read SQL model
+        gold_sql = Path("transformations/models/gold/gold_v1.sql").read_text()
+
+        # Create materialized Gold table
+        con.execute(f"CREATE TABLE gold_v1 AS {gold_sql}")
+
+        # Basic validation
+        row_count = con.execute("SELECT COUNT(*) FROM gold_v1").fetchone()[0]
+
+        if row_count == 0:
+            logger.error("Gold v1 table is empty.")
+            raise Exception("Gold materialization failed")
+        
+        logger.info(f"Gold v1 rows: {row_count}")
+
+        # Emsure storage path exists
+        gold_storage_path = Path("storage/gold")
+        gold_storage_path.mkdir(parents=True, exist_ok=True)
+
+        file_path = gold_storage_path / "btcusdt_1h_v1.parquet"
+
+        # Overwrite only if not existing (safety)
+        if file_path.exists():
+            logger.warning("Gold v1 parquet already exists. Overwriting...")
+        
+        # Export to Parquet
+        con.execute(f"COPY gold_v1 TO '{file_path}' (FORMAT PARQUET)")
+
+        logger.info("Gold v1 layer materialized successfully.")
+    
+    finally:
+        con.close()
 
 
 def run_model_stage():
