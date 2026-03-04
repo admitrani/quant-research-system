@@ -1,0 +1,100 @@
+import pandas as pd
+import numpy as np
+
+from models.walkforward.walkforward_runner import (
+    prepare_features_and_target,
+    generate_expanding_windows,
+    split_window,
+    scale_window,
+    run_walkforward_for_model,
+)
+
+# Helper: synthetic dataset (no dependency on BTC)
+
+def create_mock_dataset():
+
+    dates = pd.date_range("2019-01-01", periods=24*365*5, freq="h")
+
+    df = pd.DataFrame({
+        "open_time_utc": dates,
+        "return_1h": np.random.normal(0, 0.01, len(dates)),
+        "return_3h": np.random.normal(0, 0.01, len(dates)),
+        "return_12h": np.random.normal(0, 0.01, len(dates)),
+        "volatility_12h": np.random.normal(0.01, 0.005, len(dates)),
+        "ma20_distance": np.random.normal(0, 0.02, len(dates)),
+        "volume_zscore": np.random.normal(0, 1, len(dates)),
+        "future_return": np.random.normal(0, 0.01, len(dates)),
+        "label": np.random.randint(0, 2, len(dates)),
+    })
+
+    df.set_index("open_time_utc", inplace=True)
+    return df
+
+
+# Window generation test
+
+def test_generate_expanding_windows():
+
+    df = create_mock_dataset()
+    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+
+    assert len(windows) > 0
+    assert windows[0]["train_start"] < windows[0]["train_end"]
+    assert windows[0]["train_end"] == windows[0]["test_start"]
+
+
+# Split test (no leakage)
+
+def test_split_no_overlap():
+
+    df = create_mock_dataset()
+    X, y = prepare_features_and_target(df)
+    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+
+    X_train, y_train, X_test, y_test = split_window(X, y, windows[0])
+
+    assert X_train.index.max() < X_test.index.min()
+    assert len(X_train) > 0
+    assert len(X_test) > 0
+
+
+# Scaling test (no train leakage)
+
+def test_scaling_no_data_leakage():
+
+    df = create_mock_dataset()
+    X, y = prepare_features_and_target(df)
+    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+
+    X_train, y_train, X_test, y_test = split_window(X, y, windows[0])
+    X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
+
+    # Train should have mean approx 0 after scaling
+    assert np.allclose(X_train_s.mean(axis=0), 0, atol=1e-1)
+    assert X_train_s.shape == X_train.shape
+    assert X_test_s.shape == X_test.shape
+
+
+# Walkforward structural integrity
+
+def test_walkforward_output_structure():
+
+    df = create_mock_dataset()
+    X, y = prepare_features_and_target(df)
+    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+
+    results_df, equity, returns = run_walkforward_for_model(
+        X,
+        y,
+        df,
+        windows,
+        model_name="logistic",
+        threshold=0.5,
+        annualization_factor=365 * 24,
+        save_results=False,
+    )
+
+    assert len(results_df) == len(windows)
+    assert len(equity) == len(returns)
+    assert not np.isnan(equity).any()
+    assert len(returns) > 0

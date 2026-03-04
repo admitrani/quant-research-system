@@ -36,7 +36,7 @@ Short positions are not included in v1.
 
 - **Method:** Expanding Walk-Forward
 - **Initial Training Window:** 3 years
-- **Test Window:** 1 year
+- **Test Window:** 6 months
 - **Retraining:** At the beginning of each test window
 - **Threshold:** 0.5 (fixed)
 
