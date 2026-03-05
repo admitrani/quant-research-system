@@ -6,6 +6,7 @@ import time
 from models.model_selection.metrics_summary import main as run_metrics
 from models.robustness.robustness_runner import main as run_robustness
 from models.model_selection.candidate_selection import main as run_candidate
+from models.utils import get_risk_policy, validate_risk_policy
 
 
 LOG_DIR = Path("logs")
@@ -38,7 +39,14 @@ def run_research(stage=None):
         ("candidate", run_candidate),
     ]
 
-    if stage:
+    risk = get_risk_policy()
+    validate_risk_policy(risk)
+
+    logger.info("Risk policy loaded:")
+    for k, v in risk.items():
+        logger.info(f"{k}: {v}")
+
+    if stage and stage != "all":
         stage_names = [name for name, _ in stages]
 
         if stage not in stage_names:
@@ -79,6 +87,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--stage",
         type=str,
+        choices=["metrics", "robustness", "candidate", "all"],
+        default="all",
         help="Start execution from research stage"
     )
 

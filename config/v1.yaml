@@ -44,3 +44,12 @@ system:
     broker: ibkr
     commission_per_side: 0.0018
     slippage_per_side: 0.0005
+
+  risk:
+    initial_capital: 100000
+    position_sizing: fixed_fraction
+    risk_fraction: 1.0
+    compounding: true
+    max_positions: 1
+    max_drawdown_limit: 0.40
+    minimum_capital: 10000
