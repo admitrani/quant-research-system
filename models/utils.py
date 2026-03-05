@@ -1,4 +1,5 @@
 from config.config_loader import load_config
+from models.model_factory import get_model
 
 
 def get_annualization_factor():
@@ -15,4 +16,15 @@ def get_annualization_factor():
 
     else:
         raise ValueError(f"Unsupported interval: {interval}")
-    
+
+
+def get_baseline_model_config(model_name):
+
+    config = load_config()
+
+    model = get_model(model_name)
+
+    return {
+        "threshold": config["system"]["modeling"]["threshold"],
+        "max_depth": model.get_params().get("max_depth")
+    }

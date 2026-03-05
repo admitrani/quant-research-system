@@ -2,6 +2,7 @@
 __pycache__/
 *.py[codz]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
@@ -227,3 +228,6 @@ venv/
 
 # Environment variables
 .env
+
+# research artifacts
+models/results/

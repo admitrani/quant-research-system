@@ -56,9 +56,13 @@ def run_robustness_experiment():
     test_months = config["system"]["validation"]["test_months"]
 
     threshold_grid = [0.45, 0.5, 0.55, 0.6]
-
     rf_depths = [4, 6, 8]
     xgb_depths = [3, 4, 5]
+
+    logger.info("Robustness grid configuration:")
+    logger.info(f"RF depths: {rf_depths}")
+    logger.info(f"XGB depths: {xgb_depths}")
+    logger.info(f"Threshold grid: {threshold_grid}")
 
     df = load_gold_dataset()
     X, y = prepare_features_and_target(df)
@@ -87,18 +91,26 @@ def run_robustness_experiment():
                     )
                 )
 
+    logger.info(f"Total robustness configs: {len(jobs)}")
     logger.info(f"Running {len(jobs)} robustness configurations in parallel")
     results = Parallel(n_jobs=-1, backend="loky")(jobs)
 
     results_df = pd.DataFrame(results)
 
     top_configs = results_df.sort_values("sharpe_global", ascending=False).head(3)
-    logger.info("Top 3 robustness configurations:")
-    logger.info("\n%s", top_configs.to_string())
+    logger.info("Top 3 robustness configurations:\n%s", top_configs.to_string())
 
     project_root = Path(__file__).resolve().parents[2]
     results_path = project_root / "models" / "results"
     results_path.mkdir(parents=True, exist_ok=True)
 
     results_df.to_csv(results_path / "robustness_v1.csv", index=False)
-    print("Robustness experiment completed.")
+    logger.info(f"Artifact produced: {results_path / 'robustness_v1.csv'}")
+    logger.info("Robustness experiment completed.")
+
+
+def main():
+    run_robustness_experiment()
+
+if __name__ == "__main__":
+    main()

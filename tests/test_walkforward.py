@@ -10,6 +10,8 @@ from models.walkforward.walkforward_runner import (
     run_walkforward_for_model,
 )
 
+from models.metrics import compute_global_sharpe
+
 # Helper: synthetic dataset (no dependency on BTC)
 
 def create_mock_dataset():
@@ -142,3 +144,12 @@ def test_walkforward_structural_integrity():
     # No NaNs
     assert not np.isnan(returns).any()
     assert not np.isnan(equity_curve).any()
+
+# Sharpe function test
+def test_compute_global_sharpe_basic():
+
+    returns = np.array([0.01, -0.01, 0.02, -0.02])
+
+    sharpe = compute_global_sharpe(returns, annualization_factor=365)
+
+    assert isinstance(sharpe, float)

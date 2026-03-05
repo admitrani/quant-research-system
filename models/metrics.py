@@ -21,6 +21,16 @@ def compute_classification_metrics(y_true, y_proba, threshold=0.5):
 
     return metrics
 
+def compute_global_sharpe(returns, annualization_factor):
+
+    mean_ret = returns.mean()
+    std_ret = returns.std()
+
+    if std_ret == 0:
+        return 0.0
+
+    return (mean_ret / std_ret) * np.sqrt(annualization_factor)
+
 def compute_vectorized_trading_metrics(future_returns, y_proba, threshold, annualization_factor):
 
     signal = (y_proba > threshold).astype(int)
@@ -30,7 +40,7 @@ def compute_vectorized_trading_metrics(future_returns, y_proba, threshold, annua
     mean_ret = strategy_returns.mean()
     std_ret = strategy_returns.std()
 
-    sharpe = (mean_ret / std_ret) * np.sqrt(annualization_factor) if std_ret != 0 else 0.0
+    sharpe = compute_global_sharpe(strategy_returns, annualization_factor)
 
     hit_ratio = (strategy_returns > 0).mean()
 
@@ -56,12 +66,3 @@ def compute_degradation_slope(values):
 
     return slope
 
-def compute_global_sharpe(returns, annualization_factor):
-
-    mean_ret = returns.mean()
-    std_ret = returns.std()
-
-    if std_ret == 0:
-        return 0.0
-
-    return (mean_ret / std_ret) * np.sqrt(annualization_factor)

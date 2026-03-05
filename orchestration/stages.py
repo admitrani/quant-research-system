@@ -234,8 +234,3 @@ def run_model_stage(**kwargs):
     from models.model_stage import run_full_walkforward_experiment
     run_full_walkforward_experiment()
 
-
-def run_robustness_stage(**kwargs):
-    logger.info("Running robustness experiment...")
-    from models.robustness.robustness_runner import run_robustness_experiment
-    run_robustness_experiment()
