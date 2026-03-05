@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from ingestion.market_data import fetch_klines, save_raw, get_last_timestamp, interval_to_milliseconds
 from ingestion.audit import basic_raw_checks
 from config.config_loader import load_config
-from models.model_stage import run_full_walkforward_experiment
 from pathlib import Path
 import logging
 import duckdb
@@ -231,7 +230,12 @@ def run_gold_transformations():
 
 
 def run_model_stage(**kwargs):
-    print("Running walk-forward experiment...")
+    logger.info("Running walk-forward experiment...")
+    from models.model_stage import run_full_walkforward_experiment
     run_full_walkforward_experiment()
 
 
+def run_robustness_stage(**kwargs):
+    logger.info("Running robustness experiment...")
+    from models.robustness.robustness_runner import run_robustness_experiment
+    run_robustness_experiment()

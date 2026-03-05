@@ -4,6 +4,7 @@ import numpy as np
 from models.walkforward.walkforward_runner import (
     prepare_features_and_target,
     generate_expanding_windows,
+    prepare_walkforward_windows,
     split_window,
     scale_window,
     run_walkforward_for_model,
@@ -75,26 +76,69 @@ def test_scaling_no_data_leakage():
     assert X_test_s.shape == X_test.shape
 
 
-# Walkforward structural integrity
+# Caching test
 
-def test_walkforward_output_structure():
+def test_prepare_walkforward_windows_structure():
 
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
     windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
 
-    results_df, equity, returns = run_walkforward_for_model(
-        X,
-        y,
-        df,
-        windows,
-        model_name="logistic",
+    prepared_windows = prepare_walkforward_windows(X, y, windows, df)
+
+    assert len(prepared_windows) == len(windows)
+
+    for w in prepared_windows:
+
+        assert "X_train" in w
+        assert "y_train" in w
+        assert "X_test" in w
+        assert "y_test" in w
+        assert "future_returns" in w
+
+        assert len(w["X_test"]) == len(w["future_returns"])
+
+
+# Walkforward structural integrity
+
+def test_walkforward_structural_integrity():
+
+    df = create_mock_dataset()
+    X, y = prepare_features_and_target(df)
+    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+
+    prepared_windows = prepare_walkforward_windows(X, y, windows, df)
+
+    results_df, equity_curve, returns = run_walkforward_for_model(
+        prepared_windows,
+        model_name="rf",
         threshold=0.5,
         annualization_factor=365 * 24,
         save_results=False,
     )
 
-    assert len(results_df) == len(windows)
-    assert len(equity) == len(returns)
-    assert not np.isnan(equity).any()
-    assert len(returns) > 0
+    # OOS windows contiguous
+    prev_end = None
+    for w in windows:
+        if prev_end is not None:
+            assert w["test_start"] == prev_end
+        prev_end = w["test_end"]
+
+    # Expected OOS length
+    total_expected = 0
+
+    for w in windows:
+        mask = (df.index >= w["test_start"]) & (df.index < w["test_end"])
+        total_expected += mask.sum()
+
+    assert total_expected == len(returns)
+
+    # Equity consistency
+    calc_equity = np.prod(1 + returns)
+    assert equity_curve[-1] > 0
+
+    assert np.isclose(calc_equity, equity_curve[-1])
+
+    # No NaNs
+    assert not np.isnan(returns).any()
+    assert not np.isnan(equity_curve).any()

@@ -4,25 +4,23 @@ import shutil
 from pathlib import Path
 import logging
 from scipy.stats import linregress
-from models.walkforward.walkforward_runner import (load_gold_dataset, prepare_features_and_target, generate_expanding_windows, run_walkforward_for_model)
+from models.walkforward.walkforward_runner import (load_gold_dataset, prepare_features_and_target, prepare_walkforward_windows, generate_expanding_windows, run_walkforward_for_model)
 from config.config_loader import load_config
+from models.utils import get_annualization_factor
+from models.metrics import compute_global_sharpe
+
 
 logger = logging.getLogger(__name__)
 
 config = load_config()
+annualization_factor = get_annualization_factor()
 
 threshold = config["system"]["modeling"]["threshold"]
 initial_train_years = config["system"]["validation"]["initial_train_years"]
 test_months = config["system"]["validation"]["test_months"]
 horizon = config["system"]["modeling"]["horizon"]
 models = config["system"]["modeling"]["models"]
-interval = config["market_data"]["intervals"][0]
 
-if interval.endswith("h"):
-    hours = int(interval.replace("h", ""))
-    annualization_factor = (365 * 24) / hours
-else:
-    raise ValueError(f"Unsupported interval: {interval}")
 
 def run_full_walkforward_experiment():
 
@@ -34,31 +32,22 @@ def run_full_walkforward_experiment():
     windows = generate_expanding_windows(df, initial_train_years=initial_train_years, test_months=test_months)
     logger.info(f"Total windows generated: {len(windows)}")
 
-
     summary_rows = []
+    prepared_windows = prepare_walkforward_windows(X, y, windows, df)
 
     for model_name in models:
 
         logger.info(f"Running walk-forward for model: {model_name}")
 
         results_df, equity_curve, returns = run_walkforward_for_model(
-            X,
-            y,
-            df,
-            windows,
+            prepared_windows,
             model_name=model_name,
             threshold=threshold,
             annualization_factor=annualization_factor,
             save_results=True,
         )
 
-        # Global OOS Sharpe
-        mean_ret = returns.mean()
-        std_ret = returns.std()
-        sharpe_global = (
-            (mean_ret / std_ret) * np.sqrt(365 * 24)
-            if std_ret != 0 else 0.0
-        )
+        sharpe_global = compute_global_sharpe(returns, annualization_factor)
 
         slope_auc = linregress(results_df["window"], results_df["auc"]).slope
         slope_sharpe = linregress(results_df["window"], results_df["sharpe"]).slope
@@ -83,9 +72,6 @@ def run_full_walkforward_experiment():
 
         if np.all(returns == 0):
             logger.warning(f"{model_name}: All OOS returns are zero.")
-        
-        if std_ret == 0:
-            logger.warning(f"{model_name}: Zero std in returns (Sharpe unstable).")
 
         summary_rows.append({
             "model": model_name,

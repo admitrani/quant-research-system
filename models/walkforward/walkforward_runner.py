@@ -4,7 +4,6 @@ from pathlib import Path
 from dateutil.relativedelta import relativedelta
 from sklearn.preprocessing import StandardScaler
 from models.model_factory import get_model
-from sklearn.metrics import accuracy_score, roc_auc_score
 from models.metrics import compute_classification_metrics, compute_vectorized_trading_metrics, compute_degradation_slope
 
 
@@ -18,6 +17,7 @@ def load_gold_dataset():
     df = df.sort_values("open_time_utc")
     df.set_index("open_time_utc", inplace=True)
     return df
+
     
 def prepare_features_and_target(df):
 
@@ -34,6 +34,7 @@ def prepare_features_and_target(df):
     y = df["label"].copy()
 
     return X, y
+
 
 def generate_expanding_windows(df, initial_train_years, test_months):
 
@@ -64,6 +65,28 @@ def generate_expanding_windows(df, initial_train_years, test_months):
     
     return windows
 
+
+def prepare_walkforward_windows(X, y, windows, df_full):
+
+    prepared = []
+
+    for window in windows:
+
+        X_train, y_train, X_test, y_test = split_window(X, y, window)
+        X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
+        future_returns = df_full.loc[X_test.index, "future_return"].to_numpy()
+
+        prepared.append({
+            "X_train": X_train_s,
+            "y_train": y_train,
+            "X_test": X_test_s,
+            "y_test": y_test,
+            "future_returns": future_returns
+        })
+
+    return prepared
+
+
 def split_window(X, y, window):
 
     train_mask = (X.index >= window["train_start"]) & (X.index < window["train_end"])
@@ -76,6 +99,7 @@ def split_window(X, y, window):
 
     return X_train, y_train, X_test, y_test
 
+
 def scale_window(X_train, X_test):
 
     scaler = StandardScaler()
@@ -84,23 +108,30 @@ def scale_window(X_train, X_test):
 
     return X_train_scaled, X_test_scaled, scaler
 
-def run_walkforward_for_model(X, y, df_full, windows, model_name, threshold, annualization_factor, save_results=True):
+
+def run_walkforward_for_model(prepared_windows, model_name, threshold, max_depth=None, annualization_factor=None, save_results=True):
 
     all_results = []
     oos_returns_all = []
 
-    for i, window in enumerate(windows):
-        
-        X_train, y_train, X_test, y_test = split_window(X, y, window)
-        X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
+    if annualization_factor is None:
+        annualization_factor = 365 * 24
 
-        model = get_model(model_name)
+    for i, window_data in enumerate(prepared_windows):
+        
+        X_train_s = window_data["X_train"]
+        y_train = window_data["y_train"]
+
+        X_test_s = window_data["X_test"]
+        y_test = window_data["y_test"]
+
+        model = get_model(model_name, max_depth=max_depth)
         model.fit(X_train_s, y_train)
 
         y_proba = model.predict_proba(X_test_s)[:, 1]
 
         positions = (y_proba > threshold).astype(int)
-        future_returns = df_full.loc[X_test.index, "future_return"].values
+        future_returns = window_data["future_returns"]
         strategy_returns = positions * future_returns
         oos_returns_all.extend(strategy_returns)
         

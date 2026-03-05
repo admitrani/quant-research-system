@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, recall_score, f1_score
 from sklearn.linear_model import LinearRegression
+from models.utils import get_annualization_factor
 
 
 def compute_classification_metrics(y_true, y_proba, threshold=0.5):
@@ -31,7 +32,7 @@ def compute_vectorized_trading_metrics(future_returns, y_proba, threshold, annua
 
     sharpe = (mean_ret / std_ret) * np.sqrt(annualization_factor) if std_ret != 0 else 0.0
 
-    hit_ratio = (strategy_returns > 0).mean() if len(strategy_returns) > 0 else 0.0
+    hit_ratio = (strategy_returns > 0).mean()
 
     expectancy = mean_ret
 
@@ -54,3 +55,13 @@ def compute_degradation_slope(values):
     slope = model.coef_[0][0]
 
     return slope
+
+def compute_global_sharpe(returns, annualization_factor):
+
+    mean_ret = returns.mean()
+    std_ret = returns.std()
+
+    if std_ret == 0:
+        return 0.0
+
+    return (mean_ret / std_ret) * np.sqrt(annualization_factor)

@@ -24,7 +24,8 @@ from orchestration.stages import (
     run_ingestion,
     run_silver_transformations,
     run_gold_transformations,
-    run_model_stage
+    run_model_stage,
+    run_robustness_stage,
 )
 
 # Current execution mode: batch
@@ -40,7 +41,8 @@ def run_pipeline(start_stage=None, backfill=False, reprocess_start=None, reproce
         ("ingestion", run_ingestion),
         ("silver", run_silver_transformations),
         ("gold", run_gold_transformations),
-        ("model", run_model_stage)
+        ("model", run_model_stage),
+        ("robustness", run_robustness_stage),
     ]
 
     if start_stage:
