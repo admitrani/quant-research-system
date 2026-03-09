@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import time
 
+from models.model_stage import main as run_walkforward
 from models.model_selection.metrics_summary import main as run_metrics
 from models.robustness.robustness_runner import main as run_robustness
 from models.model_selection.candidate_selection import main as run_candidate
@@ -34,6 +35,7 @@ def run_research(stage=None):
     pipeline_start = time.time()
 
     stages = [
+        ("walkforward", run_walkforward),
         ("metrics", run_metrics),
         ("robustness", run_robustness),
         ("candidate", run_candidate),

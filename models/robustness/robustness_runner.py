@@ -55,7 +55,7 @@ def run_robustness_experiment():
     initial_train_years = config["system"]["validation"]["initial_train_years"]
     test_months = config["system"]["validation"]["test_months"]
 
-    threshold_grid = [0.45, 0.5, 0.55, 0.6]
+    threshold_grid = [0.5, 0.55, 0.6, 0.65]
     rf_depths = [4, 6, 8]
     xgb_depths = [3, 4, 5]
 

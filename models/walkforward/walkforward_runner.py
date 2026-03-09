@@ -4,7 +4,8 @@ from pathlib import Path
 from dateutil.relativedelta import relativedelta
 from sklearn.preprocessing import StandardScaler
 from models.model_factory import get_model
-from models.metrics import compute_classification_metrics, compute_vectorized_trading_metrics, compute_degradation_slope
+from models.metrics import compute_classification_metrics, compute_vectorized_trading_metrics
+from models.utils import get_annualization_factor
 
 
 def load_gold_dataset():
@@ -66,27 +67,6 @@ def generate_expanding_windows(df, initial_train_years, test_months):
     return windows
 
 
-def prepare_walkforward_windows(X, y, windows, df_full):
-
-    prepared = []
-
-    for window in windows:
-
-        X_train, y_train, X_test, y_test = split_window(X, y, window)
-        X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
-        future_returns = df_full.loc[X_test.index, "future_return"].to_numpy()
-
-        prepared.append({
-            "X_train": X_train_s,
-            "y_train": y_train,
-            "X_test": X_test_s,
-            "y_test": y_test,
-            "future_returns": future_returns
-        })
-
-    return prepared
-
-
 def split_window(X, y, window):
 
     train_mask = (X.index >= window["train_start"]) & (X.index < window["train_end"])
@@ -108,6 +88,28 @@ def scale_window(X_train, X_test):
 
     return X_train_scaled, X_test_scaled, scaler
 
+def prepare_walkforward_windows(X, y, windows, df_full):
+
+    prepared = []
+
+    returns_1h = df_full["close_price"].pct_change().shift(-1)
+
+    for window in windows:
+
+        X_train, y_train, X_test, y_test = split_window(X, y, window)
+        X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
+        bar_returns = returns_1h.loc[X_test.index].fillna(0).to_numpy()
+
+        prepared.append({
+            "X_train": X_train_s,
+            "y_train": y_train,
+            "X_test": X_test_s,
+            "y_test": y_test,
+            "future_returns": bar_returns
+        })
+
+    return prepared
+
 
 def run_walkforward_for_model(prepared_windows, model_name, threshold, max_depth=None, annualization_factor=None, save_results=True):
 
@@ -115,7 +117,7 @@ def run_walkforward_for_model(prepared_windows, model_name, threshold, max_depth
     oos_returns_all = []
 
     if annualization_factor is None:
-        annualization_factor = 365 * 24
+        annualization_factor = get_annualization_factor()
 
     for i, window_data in enumerate(prepared_windows):
         

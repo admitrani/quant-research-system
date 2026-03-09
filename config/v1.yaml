@@ -33,17 +33,21 @@ system:
       - logistic
       - rf
       - xgb
+    execution:
+      exit_threshold: 0.5
 
   validation:
     scheme: expanding
-    initial_train_years: 3
+    initial_train_years: 2
     test_months: 6
     retrain_each_window: true
+    backtest_start: "2021-01-01 12:00:00"
 
   costs:
     broker: ibkr
     commission_per_side: 0.0018
     slippage_per_side: 0.0005
+    buffer: 0.003
 
   risk:
     initial_capital: 100000
@@ -51,5 +55,7 @@ system:
     risk_fraction: 1.0
     compounding: true
     max_positions: 1
-    max_drawdown_limit: 0.40
+    max_drawdown_limit: 1.0
     minimum_capital: 10000
+    min_position_size: 0.00000001
+

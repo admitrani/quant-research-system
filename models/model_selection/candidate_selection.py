@@ -26,6 +26,8 @@ def load_results():
 
 def compute_robustness_summary(robustness_df):
 
+    robustness_df = robustness_df[robustness_df["final_equity_multiple"] != 1.0]
+
     summary = []
 
     for model in robustness_df["model"].unique():
@@ -47,7 +49,8 @@ def compute_robustness_summary(robustness_df):
 def select_candidate_model(baseline_df, robustness_summary):
 
     merged = baseline_df.merge(robustness_summary, on="model", how="left")
-    merged = merged.sort_values("sharpe_global", ascending=False)
+    merged["selection_score"] = merged["mean_sharpe"] * 0.5 + merged["best_sharpe"] * 0.3 - merged["negative_configs"] * 0.1
+    merged = merged.sort_values("selection_score", ascending=False)
 
     candidate = merged.iloc[0]
 
@@ -56,17 +59,29 @@ def select_candidate_model(baseline_df, robustness_summary):
 
 def select_robust_config(robustness_df, model):
 
+    if "final_equity_multiple" in robustness_df.columns:
+        robustness_df = robustness_df[robustness_df["final_equity_multiple"] != 1.0]
+
     df = robustness_df[robustness_df["model"] == model].copy()
 
     # top 30% by Sharpe
     cutoff = df["sharpe_global"].quantile(0.7)
-    robust_region = df[df["sharpe_global"] >= cutoff]
+    robust_region = df[df["sharpe_global"] >= cutoff].copy()
 
     median_depth = robust_region["max_depth"].median()
     median_threshold = robust_region["threshold"].median()
 
-    robust_region = robust_region.copy()
-    robust_region["distance"] = (robust_region["max_depth"] - median_depth).abs() + (robust_region["threshold"] - median_threshold).abs()
+    depth_range = robust_region["max_depth"].max() - robust_region["max_depth"].min()
+    threshold_range = robust_region["threshold"].max() - robust_region["threshold"].min()
+
+    depth_range = depth_range if depth_range > 0 else 1
+    threshold_range = threshold_range if threshold_range > 0 else 1
+
+    robust_region["distance"] = (
+        ((robust_region["max_depth"] - median_depth) / depth_range).abs() +
+        ((robust_region["threshold"] - median_threshold) / threshold_range).abs()
+    )
+
     best_row = robust_region.sort_values("distance").iloc[0]
 
     selected_config = {

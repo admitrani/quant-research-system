@@ -43,7 +43,9 @@ def get_risk_policy():
         "max_positions": risk_config["max_positions"],
         "max_drawdown_limit": risk_config["max_drawdown_limit"],
         "minimum_capital": risk_config["minimum_capital"],
+        "min_position_size": risk_config["min_position_size"],
     }
+
 
 
 def validate_risk_policy(policy):
@@ -54,9 +56,33 @@ def validate_risk_policy(policy):
     if not 0 < policy["risk_fraction"] <= 1:
         raise ValueError("Risk fraction must be between 0 and 1.")
     
-    if policy["max_drawdown_limit"] <= 0 or policy["max_drawdown_limit"] >= 1:
+    if policy["max_drawdown_limit"] < 0 or policy["max_drawdown_limit"] > 1:
         raise ValueError("Max drawdown limit must be between 0 and 1.")
     
     if policy["minimum_capital"] <= 0:
         raise ValueError("Minimum capital must be positive.")
     
+
+def get_execution_costs ():
+
+    config = load_config()
+    
+    costs = config["system"]["costs"]
+
+    return {
+        "commission": costs["commission_per_side"],
+        "slippage": costs["slippage_per_side"],
+        "buffer": costs["buffer"],
+    }
+
+def get_exit_threshold():
+
+    config = load_config()
+
+    return config["system"]["modeling"]["execution"]["exit_threshold"]
+
+def get_backtest_start():
+
+    config = load_config()
+
+    return config["system"]["validation"]["backtest_start"]

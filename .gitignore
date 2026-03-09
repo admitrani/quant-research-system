@@ -234,3 +234,4 @@ venv/
 
 # research artifacts
 models/results/
+backtests/results/

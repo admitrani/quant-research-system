@@ -99,3 +99,11 @@ def run_full_walkforward_experiment():
     shutil.copy("config/v1.yaml", results_path / "config_snapshot_v1.yaml")
 
     print("Walk-forward experiment completed.")
+
+
+def main():
+    run_full_walkforward_experiment()
+
+
+if __name__ == "__main__":
+    main()

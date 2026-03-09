@@ -11,27 +11,7 @@ from models.walkforward.walkforward_runner import (
 )
 
 from models.metrics import compute_global_sharpe
-
-# Helper: synthetic dataset (no dependency on BTC)
-
-def create_mock_dataset():
-
-    dates = pd.date_range("2019-01-01", periods=24*365*5, freq="h")
-
-    df = pd.DataFrame({
-        "open_time_utc": dates,
-        "return_1h": np.random.normal(0, 0.01, len(dates)),
-        "return_3h": np.random.normal(0, 0.01, len(dates)),
-        "return_12h": np.random.normal(0, 0.01, len(dates)),
-        "volatility_12h": np.random.normal(0.01, 0.005, len(dates)),
-        "ma20_distance": np.random.normal(0, 0.02, len(dates)),
-        "volume_zscore": np.random.normal(0, 1, len(dates)),
-        "future_return": np.random.normal(0, 0.01, len(dates)),
-        "label": np.random.randint(0, 2, len(dates)),
-    })
-
-    df.set_index("open_time_utc", inplace=True)
-    return df
+from tests.utils.mock_data import create_mock_dataset
 
 
 # Window generation test

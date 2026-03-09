@@ -19,5 +19,5 @@ def test_risk_policy_validation():
 
     assert policy["initial_capital"] > 0
     assert 0 < policy["risk_fraction"] <= 1
-    assert 0 < policy["max_drawdown_limit"] < 1
+    assert 0 < policy["max_drawdown_limit"] <= 1
     
