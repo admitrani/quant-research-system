@@ -22,14 +22,33 @@ def compute_classification_metrics(y_true, y_proba, threshold=0.5):
     return metrics
 
 def compute_global_sharpe(returns, annualization_factor):
-
+    """Compute annualized Sharpe ratio. Returns np.nan if no trades (std=0)."""
     mean_ret = returns.mean()
     std_ret = returns.std()
 
     if std_ret == 0:
-        return 0.0
+        return np.nan
 
     return (mean_ret / std_ret) * np.sqrt(annualization_factor)
+
+def compute_daily_sharpe(strategy_returns, test_dates):
+    """
+    Compute Sharpe using daily aggregated returns × sqrt(365).
+    Matches the calculation used in the backtest pipeline.
+    """
+    series = pd.Series(strategy_returns, index=test_dates)
+    daily = series.resample("D").apply(lambda x: (1 + x).prod() - 1).dropna()
+    
+    if len(daily) < 2:
+        return np.nan
+    
+    mean_d = daily.mean()
+    std_d = daily.std()
+    
+    if std_d == 0:
+        return np.nan
+    
+    return (mean_d / std_d) * np.sqrt(365)
 
 def compute_vectorized_trading_metrics(future_returns, y_proba, threshold, annualization_factor):
 

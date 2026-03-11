@@ -229,7 +229,7 @@ def run_gold_transformations():
         con.close()
 
 
-def run_model_stage(**kwargs):
+def run_model_stage():
     logger.info("Running walk-forward experiment...")
     from models.model_stage import run_full_walkforward_experiment
     run_full_walkforward_experiment()

@@ -4,6 +4,8 @@ from pathlib import Path
 from ingestion.api_client import APIClient
 import logging
 
+from config.config_loader import load_config
+
 BASE_URL = "https://api.binance.com"
 
 logger = logging.getLogger(__name__)
@@ -68,10 +70,17 @@ def fetch_klines(
     end_time_ms=None
 ):
 
-    client = APIClient(BASE_URL)
+    config = load_config()
+    ingestion_config = config["market_data"]["ingestion"]  
+
+    client = APIClient(
+        base_url=BASE_URL,
+        max_retries=ingestion_config["max_retries"],
+        backoff_seconds=ingestion_config["backoff_seconds"]
+    )
 
     interval_ms = interval_to_milliseconds(interval)
-    limit = 1000
+    limit = ingestion_config["limit"]
     last_ts = get_last_timestamp(symbol, interval)
 
     # Determinar start_time
@@ -121,7 +130,7 @@ def fetch_klines(
             break
 
     if not all_data:
-        print("No new data.")
+        logger.info("No new data to fetch.")
         return pd.DataFrame()
 
     df = pd.DataFrame(all_data)

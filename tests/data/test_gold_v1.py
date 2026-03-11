@@ -1,20 +1,24 @@
 import duckdb
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 def test_gold_v1_integrity():
 
-    # Create in-memory DuckDB
+    np.random.seed(42)
+
+    # Create connection
     con = duckdb.connect(":memory:")
 
-    # Create minimal mock silver_prices table
+    prices = 40000 + np.cumsum(np.random.normal(0, 100, 200))
+    
     df = pd.DataFrame({
         "open_time_utc": pd.date_range("2020-01-01", periods=200, freq="h"),
-        "open_price": range(200),
-        "high_price": range(1, 201),
-        "low_price": range(200),
-        "close_price": range(1, 201),
-        "volume": [1000 + i for i in range(200)]
+        "open_price": prices * 0.999,
+        "high_price": prices * 1.001,
+        "low_price": prices * 0.998,
+        "close_price": prices,
+        "volume": np.abs(np.random.normal(500, 50, 200))
     })
 
     con.register("silver_prices", df)
@@ -32,3 +36,4 @@ def test_gold_v1_integrity():
     assert result > 0, "Gold transformation returned empty result."
 
     con.close()
+    

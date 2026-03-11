@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from models.walkforward.walkforward_runner import load_gold_dataset, prepare_features_and_target, generate_expanding_windows, prepare_walkforward_windows, run_walkforward_for_model
-from models.metrics import compute_global_sharpe
+from models.metrics import compute_daily_sharpe
 from models.utils import get_annualization_factor, get_baseline_model_config
 from config.config_loader import load_config
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def run_baseline_walkforward(model_name, prepared_windows, annualization_factor, threshold, max_depth=None):
 
-    wf_results, equity_curve, returns = run_walkforward_for_model(
+    wf_results, equity_curve, returns, oos_dates = run_walkforward_for_model(
         prepared_windows=prepared_windows,
         model_name=model_name,
         threshold=threshold,
@@ -21,10 +21,7 @@ def run_baseline_walkforward(model_name, prepared_windows, annualization_factor,
         save_results=False,
     )
 
-    sharpe_global = compute_global_sharpe(
-        returns,
-        annualization_factor
-    )
+    sharpe_global = compute_daily_sharpe(returns, oos_dates)
 
     metrics = {
         "model": model_name,

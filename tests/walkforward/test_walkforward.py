@@ -10,7 +10,7 @@ from models.walkforward.walkforward_runner import (
     run_walkforward_for_model,
 )
 
-from models.metrics import compute_global_sharpe
+from models.metrics import compute_global_sharpe, compute_daily_sharpe
 from tests.utils.mock_data import create_mock_dataset
 
 
@@ -52,10 +52,17 @@ def test_scaling_no_data_leakage():
     X_train, y_train, X_test, y_test = split_window(X, y, windows[0])
     X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
 
-    # Train should have mean approx 0 after scaling
-    assert np.allclose(X_train_s.mean(axis=0), 0, atol=1e-1)
+    # Shape preserved
     assert X_train_s.shape == X_train.shape
     assert X_test_s.shape == X_test.shape
+
+    # Verify scaler was fit ONLY on training data
+    assert np.allclose(scaler.mean_, X_train.mean(axis=0), rtol=1e-3)
+
+    # Verify test set was transformed using training statistics
+    # (if scaler had been fit on test data too, this would fail)
+    X_test_manually = (X_test.values - scaler.mean_) / scaler.scale_
+    assert np.allclose(X_test_s, X_test_manually, rtol=1e-5)
 
 
 # Caching test
@@ -91,7 +98,7 @@ def test_walkforward_structural_integrity():
 
     prepared_windows = prepare_walkforward_windows(X, y, windows, df)
 
-    results_df, equity_curve, returns = run_walkforward_for_model(
+    results_df, equity_curve, returns, oos_dates = run_walkforward_for_model(
         prepared_windows,
         model_name="rf",
         threshold=0.5,
@@ -133,3 +140,21 @@ def test_compute_global_sharpe_basic():
     sharpe = compute_global_sharpe(returns, annualization_factor=365)
 
     assert isinstance(sharpe, float)
+
+def test_compute_daily_sharpe_basic():
+    np.random.seed(42)
+    dates = pd.date_range("2021-01-01", periods=200, freq="h")
+    returns = np.random.normal(0.0001, 0.01, 200)
+    
+    sharpe = compute_daily_sharpe(returns, dates)
+    
+    assert isinstance(sharpe, float)
+    assert -15 < sharpe < 15
+
+def test_compute_daily_sharpe_zero_std():
+    dates = pd.date_range("2021-01-01", periods=48, freq="h")
+    returns = np.zeros(48)
+    
+    sharpe = compute_daily_sharpe(returns, dates)
+    
+    assert np.isnan(sharpe)

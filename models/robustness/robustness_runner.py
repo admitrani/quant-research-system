@@ -6,7 +6,7 @@ from joblib import Parallel, delayed
 from models.walkforward.walkforward_runner import load_gold_dataset, prepare_features_and_target, generate_expanding_windows, prepare_walkforward_windows, run_walkforward_for_model
 from config.config_loader import load_config
 from models.utils import get_annualization_factor
-from models.metrics import compute_global_sharpe
+from models.metrics import compute_daily_sharpe
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def run_single_config(
     annualization_factor
 ):
 
-    wf_results, equity_curve, returns = run_walkforward_for_model(
+    wf_results, equity_curve, returns, oos_dates = run_walkforward_for_model(
         prepared_windows,
         model_name=model_name,
         threshold=threshold,
@@ -30,10 +30,7 @@ def run_single_config(
         save_results=False,
     )
 
-    sharpe_global = compute_global_sharpe(
-        returns,
-        annualization_factor
-    )
+    sharpe_global = compute_daily_sharpe(returns, oos_dates)
 
     return {
         "model": model_name,
@@ -93,11 +90,11 @@ def run_robustness_experiment():
 
     logger.info(f"Total robustness configs: {len(jobs)}")
     logger.info(f"Running {len(jobs)} robustness configurations in parallel")
-    results = Parallel(n_jobs=-1, backend="loky")(jobs)
+    results = Parallel(n_jobs=4, backend="loky")(jobs)
 
     results_df = pd.DataFrame(results)
 
-    top_configs = results_df.sort_values("sharpe_global", ascending=False).head(3)
+    top_configs = results_df.sort_values("sharpe_global", ascending=False, na_position="last").head(3)
     logger.info("Top 3 robustness configurations:\n%s", top_configs.to_string())
 
     project_root = Path(__file__).resolve().parents[2]

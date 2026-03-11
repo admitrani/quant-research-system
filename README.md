@@ -1,158 +1,114 @@
-# Quant Data Engineering System
+# BTC/USDT ML Trading System
 
-## 🎯 Objective
+Quantitative trading system for BTC/USDT 1H using Machine Learning with walk-forward validation. Built with production-grade architecture.
 
-This project builds a production-grade data engineering system
-for financial market data ingestion, transformation, and recovery.
+## System Overview
 
-The long-term goal is to support quantitative trading strategies
-with a robust, scalable, reproducible, and fault-tolerant pipeline.
+The system consists of three independent pipelines:
 
-This repository focuses on:
+1. **Data Pipeline** — Ingestion → Silver → Gold (Medallion architecture)
+2. **Research Pipeline** — Walk-forward validation → Model comparison → Robustness → Candidate selection
+3. **Backtest Pipeline** — ML strategy → EMA baseline → Buy & Hold → Metrics → Equity comparison
 
-- Reliable incremental ingestion from APIs
-- Medallion architecture (Bronze / Silver / Gold)
-- SQL-based transformations (DuckDB)
-- Runtime data quality validation
-- Gap detection and automatic backfill
-- Controlled historical reprocessing
-- DAG-based orchestration
-- Idempotent execution guarantees
+### Architecture
 
----
+Binance API → Raw (Bronze) → Silver (DuckDB) → Gold (Parquet)
+↓
+Research Pipeline (XGBoost, RF, Logistic)
+↓
+Candidate Selection (XGBoost, depth=4, threshold=0.6)
+↓
+Backtest Pipeline (Backtrader)
+↓
+Metrics & Equity Comparison
 
-## 🏗 Architecture Overview
-
-The system follows a **Medallion Architecture** with operational safeguards.
-
-### 🥉 Bronze (Raw Data Lake)
-
-- Immutable storage
-- Append-only (incremental mode)
-- Partitioned by year/month
-- Stored exactly as received from source
-- Source of truth
-- Supports:
-  - Incremental loading
-  - Gap detection
-  - Surgical backfill
-  - Range reprocessing
-
-### 🥈 Silver (Clean Layer)
-
-- Structured and typed schema
-- Deduplicated
-- Ordered and validated
-- Runtime data integrity checks
-- Analytical-ready dataset
-- Exported to Parquet + materialized in DuckDB
-
-### 🥇 Gold (Curated Layer)
-
-- Strategy-ready datasets
-- Feature engineering layer
-- Aggregated / ML-ready tables
-- Built on top of validated Silver data
-
----
-
-## 🔁 Pipeline Execution Modes
-
-The pipeline supports multiple controlled execution paths:
-
-### 1️⃣ Incremental Mode (Default)
-
-Fetches only new candles using watermark logic.
-
-python -m orchestration.pipeline --stage ingestion
-
----
-
-### 2️⃣ Gap Backfill Mode
-
-Detects historical gaps and fills only missing candles.
-
-python -m orchestration.pipeline --stage ingestion --backfill
-
-Characteristics:
-- No full reload
-- No duplication
-- Re-validates after repair
-- Idempotent
-
----
-
-### 3️⃣ Range Reprocessing Mode
-
-Rewrites a specific historical window without affecting other data.
-
+## Execution
+```bash
+# Pipeline 1: Data ingestion and transformation
 python -m orchestration.pipeline
---stage ingestion
---reprocess-start YYYY-MM-DD
---reprocess-end YYYY-MM-DD
 
-Characteristics:
-- Rewrites only affected rows
-- Does not drop full partitions
-- Preserves data outside range
-- Fully controlled recovery
+# Pipeline 2: Research (walk-forward + model selection)
+python -m models.research.research_pipeline
 
----
+# Pipeline 3: Backtest (ML + baselines + metrics)
+python -m backtests.v1.backtest_pipeline
+```
 
-## 🧪 Data Quality & Validation
+Each pipeline supports partial execution with `--stage <stage_name>`.
 
-Runtime validation includes:
+## v1 Configuration
 
-- Schema validation (Silver layer)
-- Duplicate detection
-- Null checks
-- Range validation
-- Ordering validation
-- Temporal gap detection
-- Volume anomaly detection (z-score)
-- Post-backfill revalidation
+| Parameter              | Value                    |
+|------------------------|--------------------------|
+| Asset                  | BTC/USDT                 |
+| Timeframe              | 1H                       |
+| Historical Range       | 2019-01-01 → 2026-03-03  |
+| Label Horizon          | t+3 (3 hours)            |
+| Mode                   | Long / Flat              |
+| Initial Training       | 2 years                  |
+| Test Window            | 6 months                 |
+| OOS Windows            | 10                       |
+| Selected Model         | XGBoost (depth=4, threshold=0.6) |
+| Commission per side    | 0.18%                    |
+| Slippage per side      | 0.05%                    |
+| Initial Capital        | $100,000                 |
+| Risk Fraction          | 1.0 (all-in)            |
 
-The system is designed to fail fast on structural violations.
+Full configuration: `config/v1.yaml`
 
----
+## v1 Results
 
-## 🧠 Design Principles
+| Metric          | ML Strategy | EMA Baseline | Buy & Hold |
+|-----------------|-------------|--------------|------------|
+| Final Value     | $9,995      | $9,998       | $232,964   |
+| CAGR            | -27.2%      | -35.9%       | +17.8%     |
+| Sharpe          | -2.32       | -1.25        | 0.57       |
+| Max Drawdown    | 90.6%       | 93.0%        | 77.1%      |
+| Total Trades    | 665         | 382          | —          |
+| Win Rate        | 45.9%       | 22.0%        | —          |
+| Profit Factor   | 0.557       | 0.717        | —          |
 
-- Idempotent execution
-- Deterministic transformations
-- Recovery-first architecture
-- Separation of raw vs transformed logic
-- No silent failures
-- Layered responsibility
-- Append-only raw storage
+Both ML and EMA touched minimum capital ($10k) before end of 2022.
+Buy & Hold remained active for the full OOS period (2021-2026).
 
----
+## Features (Gold v1)
 
-## 📊 Execution Flow
+1. `return_1h` — 1-hour price return
+2. `return_3h` — 3-hour rolling return
+3. `return_12h` — 12-hour rolling return
+4. `volatility_12h` — 12-hour rolling volatility
+5. `ma20_distance` — Distance to 20-period moving average
+6. `volume_zscore` — 20-hour volume z-score
 
-API → Incremental Load → Raw Lake → Validation  
-→ Silver Transformation → Runtime Checks → Export  
-→ Gold (future feature layer)
+## Key Design Decisions
 
----
+- **Config-driven**: All parameters in `config/v1.yaml`, no hardcoded values
+- **Medallion architecture**: Bronze/Silver/Gold with immutable Gold
+- **Walk-forward validation**: Expanding window, retraining each period
+- **Unified metrics**: Custom Sharpe (daily returns × √365) across all strategies
+- **Anti-leakage**: `future_return` never used as feature; LAG-based features only
 
-## 🔄 Development Workflow
+## Future Extensions (v2)
 
-This repository follows a feature-branch workflow:
+- Magnitude-filtered label (`future_return_6h > 0.0075`)
+- Additional features (`return_24h`, etc.)
+- Reduced risk fraction
+- Multi-asset expansion
 
-- main: production-ready code
-- feature/*: isolated development branches
+## Tech Stack
 
-All new features are developed in feature branches
-and merged into main.
+Python, Backtrader, XGBoost, DuckDB, Pandas, scikit-learn
 
----
+## Project Structure
 
-## 🚀 Future Extensions
+config/              # v1.yaml, config_loader.py
+ingestion/           # API client, market data, audit
+transformations/     # Silver/Gold SQL models
+orchestration/       # Pipeline stages
+models/              # Walk-forward, robustness, candidate selection
+strategies/          # ML strategy (Backtrader)
+backtests/v1/        # ML backtest, EMA/B&H baselines, metrics
+storage/             # Bronze/Silver/Gold parquet files
+tests/               # 71 tests covering critical paths
+docs/                # Specifications, data freeze, risk policy
 
-- ML feature store integration
-- Live event-driven ingestion
-- Metadata tracking table (run history)
-- Cloud storage migration
-- Orchestrator migration (Airflow/Prefect)
-- Distributed compute support

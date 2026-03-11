@@ -6,11 +6,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from models.utils import get_backtest_start, get_execution_costs, get_risk_policy, get_annualization_factor
+from config.config_loader import get_gold_path
 
 logger = logging.getLogger(__name__)
 
 
-# Strategy definition
+# Strategies
 
 class EMABaseline(bt.Strategy):
 
@@ -85,8 +86,7 @@ class BuyAndHold(bt.Strategy):
 
 def load_data():
 
-    project_root = Path(__file__).resolve().parents[3]
-    gold_path = project_root / "storage" / "gold" / "btcusdt_1h_v1.parquet"
+    gold_path = get_gold_path()
 
     df = pd.read_parquet(gold_path)
     backtest_start = get_backtest_start()
@@ -103,7 +103,10 @@ def load_data():
     return df
 
 
+# Shared helpers
+
 def compute_metrics_from_returns(returns_series, annualization_factor):
+    """Compute Sharpe (daily), Sortino (hourly), and Volatility (hourly)."""
 
     returns_daily = returns_series.resample("D").apply(lambda x: (1 + x).prod() - 1).dropna()
     mean_d = returns_daily.mean()
@@ -122,7 +125,85 @@ def compute_metrics_from_returns(returns_series, annualization_factor):
     return sharpe, sortino, volatility
 
 
-# Backtest runner
+def _setup_cerebro(df, strategy_class, strategy_params, costs, risk):
+    """Common Backtrader cerebro setup for all baseline strategies."""
+
+    cerebro = bt.Cerebro()
+
+    data = bt.feeds.PandasData(dataname=df)
+    cerebro.adddata(data)
+
+    cerebro.addstrategy(strategy_class, **strategy_params)
+
+    cerebro.broker.setcash(risk["initial_capital"])
+    cerebro.broker.setcommission(commission=costs["commission"])
+    cerebro.broker.set_slippage_perc(costs["slippage"])
+
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
+    cerebro.addanalyzer(bt.analyzers.TimeReturn, _name="timereturn")
+    cerebro.addanalyzer(bt.analyzers.Returns, _name="returns")
+
+    return cerebro
+
+
+def _build_equity_df(strat, initial_capital):
+    """Build equity DataFrame from TimeReturn analyzer."""
+
+    returns_dict = strat.analyzers.timereturn.get_analysis()
+    equity_df = pd.DataFrame(list(returns_dict.items()), columns=["datetime", "return"])
+    equity_df["equity_curve"] = (1 + equity_df["return"]).cumprod() * initial_capital
+
+    return equity_df
+
+
+def _compute_base_metrics(strat, cerebro, equity_df, risk, annualization_factor):
+    """Compute metrics common to all strategies: Sharpe, CAGR, Calmar, etc."""
+
+    returns_series = equity_df.set_index("datetime")["return"]
+    sharpe, sortino, volatility = compute_metrics_from_returns(returns_series, annualization_factor)
+
+    final_value = cerebro.broker.getvalue()
+    max_dd = strat.analyzers.drawdown.get_analysis()["max"]["drawdown"]
+
+    years = (equity_df["datetime"].iloc[-1] - equity_df["datetime"].iloc[0]).days / 365.25
+    cagr = (final_value / risk["initial_capital"]) ** (1 / years) - 1 if years > 0 else None
+    calmar = cagr / (max_dd / 100) if max_dd and max_dd > 0 else None
+
+    exposure = strat.bars_in_market / strat.total_bars if strat.total_bars > 0 else 0
+
+    return {
+        "final_value": final_value,
+        "cagr": cagr,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "volatility": volatility,
+        "max_drawdown_pct": max_dd,
+        "calmar_ratio": calmar,
+        "exposure": exposure,
+    }
+
+
+def _save_results(metrics, equity_df, results_path, name, plot_title):
+    """Save metrics CSV, equity CSV, and equity plot."""
+
+    results_path.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame([metrics]).to_csv(results_path / f"metrics_{name}_v1.csv", index=False)
+    equity_df.to_csv(results_path / f"equity_{name}_v1.csv", index=False)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(equity_df["datetime"], equity_df["equity_curve"])
+    plt.title(plot_title)
+    plt.xlabel("Date")
+    plt.ylabel("Portfolio Value")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(results_path / f"equity_{name}_v1.png")
+    plt.close()
+
+
+# Backtest runners
 
 def run_backtest():
 
@@ -135,47 +216,27 @@ def run_backtest():
     logger.info(f"Costs — commission: {costs['commission']} | slippage: {costs['slippage']} | buffer: {costs['buffer']}")
     logger.info(f"Capital: {risk['initial_capital']} | Min capital: {risk['minimum_capital']}")
 
-    cerebro = bt.Cerebro()
-
     df = load_data()
-    data = bt.feeds.PandasData(dataname=df)
-    cerebro.adddata(data)
 
-    cerebro.addstrategy(
-        EMABaseline,
-        execution_buffer=execution_buffer,
-        minimum_capital=risk["minimum_capital"],
-        min_position_size=risk["min_position_size"],
+    cerebro = _setup_cerebro(
+        df=df,
+        strategy_class=EMABaseline,
+        strategy_params={
+            "execution_buffer": execution_buffer,
+            "minimum_capital": risk["minimum_capital"],
+            "min_position_size": risk["min_position_size"],
+        },
+        costs=costs,
+        risk=risk,
     )
-
-    cerebro.broker.setcash(risk["initial_capital"])
-    cerebro.broker.setcommission(commission=costs["commission"])
-    cerebro.broker.set_slippage_perc(costs["slippage"])
-
-    cerebro.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
-    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
-    cerebro.addanalyzer(bt.analyzers.TimeReturn, _name="timereturn")
-    cerebro.addanalyzer(bt.analyzers.Returns, _name="returns")
 
     results = cerebro.run()
     strat = results[0]
 
-    exposure = strat.bars_in_market / strat.total_bars if strat.total_bars > 0 else 0
+    equity_df = _build_equity_df(strat, risk["initial_capital"])
+    base = _compute_base_metrics(strat, cerebro, equity_df, risk, annualization_factor)
 
-    returns_dict = strat.analyzers.timereturn.get_analysis()
-    equity_df = pd.DataFrame(list(returns_dict.items()), columns=["datetime", "return"])
-    equity_df["equity_curve"] = (1 + equity_df["return"]).cumprod() * risk["initial_capital"]
-
-    returns_series = equity_df.set_index("datetime")["return"]
-    sharpe, sortino, volatility = compute_metrics_from_returns(returns_series, annualization_factor)
-
-    final_value = strat.broker.getvalue()
-    max_dd = strat.analyzers.drawdown.get_analysis()["max"]["drawdown"]
-
-    years = (equity_df["datetime"].iloc[-1] - equity_df["datetime"].iloc[0]).days / 365
-    cagr = (final_value / risk["initial_capital"]) ** (1 / years) - 1 if years > 0 else None
-    calmar = cagr / (max_dd / 100) if max_dd > 0 else None
-
+    # EMA-specific trade metrics
     trades = strat.analyzers.trades.get_analysis()
     gross_profit = trades["won"]["pnl"]["total"]
     gross_loss = abs(trades["lost"]["pnl"]["total"])
@@ -188,44 +249,24 @@ def run_backtest():
     win_rate = won / total_closed if total_closed > 0 else None
     avg_trade_duration = trades.get("len", {}).get("average", None)
 
-    results_path = Path(__file__).parent / "results"
-    results_path.mkdir(parents=True, exist_ok=True)
-
     metrics = {
-        "final_value": final_value,
-        "cagr": cagr,
-        "sharpe": sharpe,
-        "sortino": sortino,
-        "volatility": volatility,
-        "max_drawdown_pct": max_dd,
-        "calmar_ratio": calmar,
+        **base,
         "total_trades": total_closed,
         "win_rate": win_rate,
         "profit_factor": profit_factor,
         "expectancy_per_trade": expectancy,
         "net_pnl": net_pnl,
-        "exposure": exposure,
         "avg_trade_duration": avg_trade_duration,
     }
 
-    pd.DataFrame([metrics]).to_csv(results_path / "metrics_ema_v1.csv", index=False)
-    equity_df.to_csv(results_path / "equity_ema_v1.csv", index=False)
+    results_path = Path(__file__).parent / "results"
+    _save_results(metrics, equity_df, results_path, "ema", "v1 EMA Baseline Equity Curve")
 
-    logger.info(f"EMA final value: {final_value:.2f}")
-    logger.info(f"EMA CAGR: {cagr:.4f} | Sharpe: {sharpe:.4f} | Max DD: {max_dd:.2f}%")
+    logger.info(f"EMA final value: {base['final_value']:.2f}")
+    logger.info(f"EMA CAGR: {base['cagr']:.4f} | Sharpe: {base['sharpe']:.4f} | Max DD: {base['max_drawdown_pct']:.2f}%")
     logger.info(f"EMA Trades: {total_closed} | Win Rate: {win_rate:.4f} | Profit Factor: {profit_factor:.4f}")
-    logger.info(f"EMA Exposure: {exposure:.4f} | Avg Trade Duration: {avg_trade_duration} bars")
+    logger.info(f"EMA Exposure: {base['exposure']:.4f} | Avg Trade Duration: {avg_trade_duration} bars")
     logger.info(f"Results saved to: {results_path}")
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(equity_df["datetime"], equity_df["equity_curve"])
-    plt.title("v1 EMA Baseline Equity Curve")
-    plt.xlabel("Date")
-    plt.ylabel("Portfolio Value")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(results_path / "equity_ema_v1.png")
-    plt.close()
 
     return cerebro, strat, metrics, equity_df
 
@@ -241,87 +282,48 @@ def run_buy_and_hold():
     logger.info(f"Costs — commission: {costs['commission']} | slippage: {costs['slippage']} | buffer: {costs['buffer']}")
     logger.info(f"Capital: {risk['initial_capital']}")
 
-    cerebro_bh = bt.Cerebro()
-
     df = load_data()
-    data = bt.feeds.PandasData(dataname=df)
-    cerebro_bh.adddata(data)
 
-    cerebro_bh.addstrategy(
-        BuyAndHold,
-        execution_buffer=execution_buffer,
+    cerebro = _setup_cerebro(
+        df=df,
+        strategy_class=BuyAndHold,
+        strategy_params={
+            "execution_buffer": execution_buffer,
+        },
+        costs=costs,
+        risk=risk,
     )
 
-    cerebro_bh.broker.setcash(risk["initial_capital"])
-    cerebro_bh.broker.setcommission(commission=costs["commission"])
-    cerebro_bh.broker.set_slippage_perc(costs["slippage"])
+    results = cerebro.run()
+    strat = results[0]
 
-    cerebro_bh.addanalyzer(bt.analyzers.DrawDown, _name="drawdown")
-    cerebro_bh.addanalyzer(bt.analyzers.TradeAnalyzer, _name="trades")
-    cerebro_bh.addanalyzer(bt.analyzers.TimeReturn, _name="timereturn")
-    cerebro_bh.addanalyzer(bt.analyzers.Returns, _name="returns")
+    equity_df = _build_equity_df(strat, risk["initial_capital"])
+    base = _compute_base_metrics(strat, cerebro, equity_df, risk, annualization_factor)
 
-    results = cerebro_bh.run()
-    strat_bh = results[0]
-
-    exposure = strat_bh.bars_in_market / strat_bh.total_bars if strat_bh.total_bars > 0 else 0
-
-    returns_dict = strat_bh.analyzers.timereturn.get_analysis()
-    equity_bh = pd.DataFrame(list(returns_dict.items()), columns=["datetime", "return"])
-    equity_bh["equity_curve"] = (1 + equity_bh["return"]).cumprod() * risk["initial_capital"]
-
-    returns_series_bh = equity_bh.set_index("datetime")["return"]
-    sharpe, sortino, volatility = compute_metrics_from_returns(returns_series_bh, annualization_factor)
-
-    final_value = strat_bh.broker.getvalue()
-    max_dd = strat_bh.analyzers.drawdown.get_analysis()["max"]["drawdown"]
-
-    years = (equity_bh["datetime"].iloc[-1] - equity_bh["datetime"].iloc[0]).days / 365
-    cagr = (final_value / risk["initial_capital"]) ** (1 / years) - 1 if years > 0 else None
-    calmar = cagr / (max_dd / 100) if max_dd > 0 else None
-
-    trades = strat_bh.analyzers.trades.get_analysis()
+    # Buy & Hold opens exactly one position and never closes it, so
+    # per-trade metrics (win_rate, profit_factor, expectancy) are not
+    # applicable and are set to None to avoid misleading comparisons.
+    trades = strat.analyzers.trades.get_analysis()
     total_closed = trades.get("total", {}).get("closed", 0)
-    avg_trade_duration = None  # Buy & Hold never closes a position
 
-    results_path = Path(__file__).parent / "results"
-    results_path.mkdir(parents=True, exist_ok=True)
-
-    metrics_bh = {
-        "final_value": final_value,
-        "cagr": cagr,
-        "sharpe": sharpe,
-        "sortino": sortino,
-        "volatility": volatility,
-        "max_drawdown_pct": max_dd,
-        "calmar_ratio": calmar,
+    metrics = {
+        **base,
         "total_trades": total_closed,
         "win_rate": None,
         "profit_factor": None,
         "expectancy_per_trade": None,
-        "net_pnl": final_value - risk["initial_capital"],
-        "exposure": exposure,
-        "avg_trade_duration": avg_trade_duration,
+        "net_pnl": base["final_value"] - risk["initial_capital"],
+        "avg_trade_duration": None,
     }
 
-    pd.DataFrame([metrics_bh]).to_csv(results_path / "metrics_buy_hold_v1.csv", index=False)
-    equity_bh.to_csv(results_path / "equity_buy_hold_v1.csv", index=False)
+    results_path = Path(__file__).parent / "results"
+    _save_results(metrics, equity_df, results_path, "buy_hold", "v1 Buy and Hold Equity Curve")
 
-    logger.info(f"Buy & Hold final value: {final_value:.2f}")
-    logger.info(f"Buy & Hold CAGR: {cagr:.4f} | Sharpe: {sharpe:.4f} | Max DD: {max_dd:.2f}%")
+    logger.info(f"Buy & Hold final value: {base['final_value']:.2f}")
+    logger.info(f"Buy & Hold CAGR: {base['cagr']:.4f} | Sharpe: {base['sharpe']:.4f} | Max DD: {base['max_drawdown_pct']:.2f}%")
     logger.info(f"Results saved to: {results_path}")
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(equity_bh["datetime"], equity_bh["equity_curve"])
-    plt.title("v1 Buy and Hold Equity Curve")
-    plt.xlabel("Date")
-    plt.ylabel("Portfolio Value")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(results_path / "equity_buy_hold_v1.png")
-    plt.close()
-
-    return cerebro_bh, strat_bh, metrics_bh, equity_bh
+    return cerebro, strat, metrics, equity_df
 
 
 if __name__ == "__main__":
@@ -332,3 +334,4 @@ if __name__ == "__main__":
 
     run_backtest()
     run_buy_and_hold()
+    

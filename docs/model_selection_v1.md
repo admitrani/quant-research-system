@@ -58,7 +58,7 @@ XGBoost
 - max_depth: [3, 4, 5]
 
 Threshold
-- [0.45, 0.5, 0.55, 0.6]
+- [0.5, 0.55, 0.6, 0.65]
 
 Total configurations tested: 24
 
@@ -95,14 +95,31 @@ Example output:
 
 ---
 
-## Selected Model
+## Selected Candidate
 
-Model: Random Forest  
-Depth: 6  
-Threshold: 0.55  
+- **Model:** XGBoost
+- **Max Depth:** 4
+- **Threshold:** 0.60 (robust configuration)
 
-Baseline Sharpe ≈ 0.95  
-Robust Sharpe ≈ 1.38  
+### Baseline Metrics (threshold=0.5)
+- Sharpe Global: 0.735
+- Final Equity Multiple: 3.12x
+
+### Robust Configuration Metrics (threshold=0.6)
+- Sharpe Global: 1.497
+- Final Equity Multiple: 4.71x
+- Mean Sharpe Window: 1.599
+- Std Sharpe Window: 1.672
+- Negative Windows: 1/10
+
+### Selection Rationale
+
+Random Forest achieved a higher base Sharpe (0.837 vs 0.735), but XGBoost was
+selected by the composite scoring function that integrates robustness metrics.
+XGBoost showed better performance under threshold perturbation and fewer
+negative configurations across the grid.
+
+Source: `candidate_v1.json`, `model_comparison_v1.csv`, `robustness_v1.csv`
 
 ---
 

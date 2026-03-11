@@ -26,7 +26,7 @@ def load_results():
 
 def compute_robustness_summary(robustness_df):
 
-    robustness_df = robustness_df[robustness_df["final_equity_multiple"] != 1.0]
+    robustness_df = robustness_df[robustness_df["sharpe_global"].notna()]
 
     summary = []
 
@@ -60,7 +60,7 @@ def select_candidate_model(baseline_df, robustness_summary):
 def select_robust_config(robustness_df, model):
 
     if "final_equity_multiple" in robustness_df.columns:
-        robustness_df = robustness_df[robustness_df["final_equity_multiple"] != 1.0]
+        robustness_df = robustness_df[robustness_df["sharpe_global"].notna()]
 
     df = robustness_df[robustness_df["model"] == model].copy()
 

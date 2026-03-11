@@ -3,29 +3,34 @@ import pandas as pd
 from datetime import datetime
 
 
-def load_all_timestamps(base_path):
+def _load_raw_timestamps(base_path: Path) -> pd.Series:
+    """Load and concatenate open_time timestamps from all raw parquet files."""
     parquet_files = list(base_path.rglob("*.parquet"))
 
     if not parquet_files:
         return pd.Series(dtype="int64")
 
-    ts_parts = []
+    parts = []
 
     for file in parquet_files:
         df = pd.read_parquet(file, columns=["0"])
-        col = pd.to_numeric(df["0"], errors="coerce").dropna()
+        col = pd.to_numeric(df["0"], errors="coerce").dropna().astype("int64")
         if not col.empty:
-            ts_parts.append(col.astype("int64"))
+            parts.append(col)
 
-    if not ts_parts:
+    if not parts:
         return pd.Series(dtype="int64")
 
-    timestamps = pd.concat(ts_parts, ignore_index=True)
-    return timestamps.sort_values().reset_index(drop=True)
+    return pd.concat(parts, ignore_index=True).sort_values().reset_index(drop=True)
+
+
+def load_all_timestamps(base_path):
+    """Public wrapper — kept for backward compatibility."""
+    return _load_raw_timestamps(base_path)
 
 
 def basic_raw_checks(base_path, interval_ms):
-    timestamps = load_all_timestamps(base_path)
+    timestamps = _load_raw_timestamps(base_path)
 
     if timestamps.empty:
         return {
@@ -60,24 +65,15 @@ def basic_raw_checks(base_path, interval_ms):
         "missing_candles": int(missing_candles),
     }
 
+
 def detect_raw_gaps_from_path(base_path, interval_ms):
 
-    parquet_files = list(base_path.rglob("*.parquet"))
+    ts = _load_raw_timestamps(base_path)
 
-    if not parquet_files:
+    if ts.empty or len(ts) < 2:
         return pd.DataFrame()
 
-    timestamps = []
-
-    for file in parquet_files:
-        df = pd.read_parquet(file, columns=["0"])
-        timestamps.append(pd.to_numeric(df["0"], errors="coerce"))
-
-    ts = pd.concat(timestamps).dropna().astype("int64")
-    ts = ts.drop_duplicates().sort_values().reset_index(drop=True)
-
-    if len(ts) < 2:
-        return pd.DataFrame()
+    ts = ts.drop_duplicates().reset_index(drop=True)
 
     continuity = pd.DataFrame({"next_open_time": ts})
     continuity["prev_open_time"] = continuity["next_open_time"].shift(1)

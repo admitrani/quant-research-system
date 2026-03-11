@@ -41,9 +41,12 @@ system:
     risk_fraction: 1.0
     compounding: true
     max_positions: 1
-    max_drawdown_limit: 0.40
+    max_drawdown_limit: 1.0
     minimum_capital: 10000
 ```
+
+> **Note v1:** Using `max_drawdown_limit: 1.0` intentionaly to show real model behaviour.
+> The `minimum_capital` of $10,000 acts as a kill-switch.
 
 ---
 
@@ -100,9 +103,9 @@ This constraint simplifies the architecture and reflects the current strategy de
 
 ### Max Drawdown Limit
 
-max_drawdown_limit = 0.40
+max_drawdown_limit = 1.0
 
-Trading stops if drawdown exceeds 40%.
+In production, a limit of around 40% would be mindful, but for research puposes I left it at 100% to show real model behaviour.
 
 This acts as a risk kill-switch, protecting the system from:
 
@@ -110,8 +113,6 @@ This acts as a risk kill-switch, protecting the system from:
 - regime changes
 - unexpected data issues
 - pipeline failures
-
-The value was selected based on typical drawdowns observed in systematic strategies with Sharpe ratios around 1.
 
 ### Minimum Capital
 
@@ -126,10 +127,6 @@ This prevents the system from continuing to operate after severe capital loss.
 ## Stop Trading Conditions
 
 The system stops trading when any of the following occurs:
-
-### Maximum drawdown exceeded
-
-drawdown > 40%
 
 ### Capital below minimum threshold
 

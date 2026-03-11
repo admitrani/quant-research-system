@@ -35,10 +35,10 @@ Short positions are not included in v1.
 ## Validation Scheme
 
 - **Method:** Expanding Walk-Forward
-- **Initial Training Window:** 3 years
+- **Initial Training Window:** 2 years
 - **Test Window:** 6 months
 - **Retraining:** At the beginning of each test window
-- **Threshold:** 0.5 (fixed)
+- **Threshold:** 0.5 (fixed; robust candidate uses 0.6)
 
 No parameter optimization is performed after observing results.
 

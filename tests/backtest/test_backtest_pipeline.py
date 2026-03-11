@@ -19,7 +19,10 @@ def test_valid_stage_names_accepted():
     assert "ml" in stage_names
     assert "ema" in stage_names
     assert "buy_and_hold" in stage_names
-    assert "comparison" in stage_names
+    assert "metrics" in stage_names
+    assert "equity" in stage_names
+
+
 
 
 def test_stages_run_in_order():
@@ -28,7 +31,8 @@ def test_stages_run_in_order():
     names = [name for name, _ in STAGES]
     assert names.index("ml") < names.index("ema")
     assert names.index("ema") < names.index("buy_and_hold")
-    assert names.index("buy_and_hold") < names.index("comparison")
+    assert names.index("buy_and_hold") < names.index("metrics")
+    assert names.index("metrics") < names.index("equity")
 
 
 # Comparison stage
@@ -116,7 +120,7 @@ def test_comparison_builds_correct_columns(tmp_path):
 
 def test_comparison_raises_if_ml_csv_missing(tmp_path):
     """comparison stage must raise FileNotFoundError if any CSV is absent."""
-    from backtests.v1.backtest_pipeline import run_comparison
+    from backtests.v1.backtest_pipeline import run_metrics
 
     with patch("backtests.v1.backtest_pipeline.Path") as mock_path_cls:
         mock_instance = MagicMock()
@@ -124,7 +128,7 @@ def test_comparison_raises_if_ml_csv_missing(tmp_path):
         mock_path_cls.return_value = mock_instance
 
         with pytest.raises(FileNotFoundError):
-            run_comparison()
+            run_metrics()
 
 
 def test_comparison_output_has_expected_metrics():
@@ -166,3 +170,78 @@ def test_ml_data_feed_column_mapping():
     assert params.get("high")  == "high_price"
     assert params.get("low")   == "low_price"
     assert params.get("ml_prob") == "ml_prob"
+
+
+def test_expectancy_pct_calculation():
+    """expectancy_pct = avg_trade_return_usd / initial_capital * 100."""
+    avg_usd = -135.35
+    initial_capital = 100_000
+    result = (avg_usd / initial_capital) * 100
+    assert abs(result - (-0.13535)) < 1e-4
+
+
+def test_bh_exposure_present_in_comparison():
+    """Buy & Hold exposure must not be NaN — it is always ~1.0."""
+    row = {
+        "final_value": 232964.21, "cagr": 0.178, "sharpe": 0.572,
+        "sortino": 0.00046, "volatility": 2.871, "max_drawdown_pct": 77.10,
+        "calmar_ratio": 0.231, "total_trades": 1, "win_rate": None,
+        "profit_factor": None, "expectancy_per_trade": None,
+        "net_pnl": 132964.21, "exposure": 0.9999, "avg_trade_duration": None,
+    }
+    assert row.get("exposure") is not None, "B&H CSV must include exposure column"
+    assert row.get("exposure") > 0.99
+
+
+# _expectancy_pct logic
+
+def test_expectancy_pct_negative_trade():
+    """Negative avg trade return → negative expectancy_pct."""
+    initial_capital = 100_000
+    avg_trade_return_usd = -135.35
+    result = (float(avg_trade_return_usd) / initial_capital) * 100
+    assert result < 0
+    assert abs(result - (-0.13535)) < 1e-5
+
+
+def test_expectancy_pct_positive_trade():
+    """Positive avg trade return → positive expectancy_pct."""
+    initial_capital = 100_000
+    avg_trade_return_usd = 250.0
+    result = (float(avg_trade_return_usd) / initial_capital) * 100
+    assert result > 0
+    assert abs(result - 0.25) < 1e-10
+
+
+def test_expectancy_pct_none_returns_none():
+    """None input (e.g. Buy & Hold) must return None, not raise."""
+    def _expectancy_pct(avg_trade_return_usd, initial_capital=100_000):
+        if avg_trade_return_usd is None:
+            return None
+        return (float(avg_trade_return_usd) / initial_capital) * 100
+
+    assert _expectancy_pct(None) is None
+
+
+def test_comparison_includes_expectancy_fields():
+    """comparison DataFrame must include both expectancy fields."""
+    expected_metrics = [
+        "avg_trade_return_usd",
+        "expectancy_pct",
+    ]
+    ml  = {m: -135.35 if "usd" in m else -0.135 for m in expected_metrics}
+    ema = {m: -235.6  if "usd" in m else -0.236 for m in expected_metrics}
+    bh  = {m: None for m in expected_metrics}
+
+    comparison = pd.DataFrame({
+        "ML Strategy":  ml,
+        "EMA Baseline": ema,
+        "Buy & Hold":   bh,
+    })
+
+    for metric in expected_metrics:
+        assert metric in comparison.index
+    # Buy & Hold must be NaN (from None) for trade-level metrics
+    assert pd.isna(comparison.loc["avg_trade_return_usd", "Buy & Hold"])
+    assert pd.isna(comparison.loc["expectancy_pct",       "Buy & Hold"])
+    

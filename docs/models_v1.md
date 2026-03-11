@@ -23,10 +23,10 @@ Hyperparameters are intentionally conservative in v1 to avoid overfitting and pr
 Controlled via `v1.yaml`.
 
 - **Scheme:** Expanding walk-forward  
-- **Initial training window:** 3 years  
+- **Initial training window:** 2 years  
 - **Test window:** 6 months  
 - **Retraining:** Full retraining per window  
-- **Total OOS windows:** 8  
+- **Total OOS windows:** 10  
 
 ### Temporal Split
 
@@ -126,18 +126,20 @@ This avoids relying solely on per-window averages and better approximates real d
 
 # Results Summary (v1)
 
-| Model    | Mean AUC | Global Sharpe | Final Equity |
-|-----------|----------|---------------|--------------|
-| Logistic  | ~0.54    | ~0.71         | ~2.7x        |
-| RF        | ~0.55    | ~0.95         | ~5.37x       |
-| XGB       | ~0.54    | ~0.93         | ~5.11x       |
+| Model    | Mean AUC | Global Sharpe | Mean Sharpe/Window | Neg. Windows | Final Equity |
+|----------|----------|---------------|--------------------|-------------|-------------|
+| RF       | 0.552    | 0.837         | 1.062              | 2/10        | 3.97x       |
+| XGBoost  | 0.544    | 0.735         | 0.828              | 2/10        | 3.12x       |
+| Logistic | 0.540    | 0.375         | 0.542              | 3/10        | 1.37x       |
 
-### Observations
+Source: `model_comparison_v1.csv`, `walkforward_summary_v1.csv`
+
+## Observations
 
 - All models consistently outperform random (AUC > 0.5).
-- Random Forest provides the best balance between predictive and financial performance.
-- Boosting does not dominate under conservative hyperparameters.
-- 3 out of 8 windows show negative Sharpe across models.
+- Random Forest achieves the highest global Sharpe (0.837) and equity multiple (3.97x).
+- XGBoost shows similar AUC but lower Sharpe variability (std 1.08 vs 1.40 for RF).
+- 2-3 out of 10 windows show negative Sharpe across models.
 - No catastrophic regime breakdown observed.
 
 The detected edge is modest but structurally consistent.
@@ -195,3 +197,20 @@ This ensures:
 - Modularity
 - Config-driven experimentation
 - Clean separation of concerns
+
+---
+
+# Methodology Note: Research vs Backtest Metrics
+
+Research pipeline metrics are computed WITHOUT transaction costs. This is
+intentional: the research pipeline evaluates predictive quality across models
+under identical conditions. Since costs are equal for all models, including
+them would not change the model ranking but would add implementation complexity.
+
+The backtest pipeline applies the full cost model (0.18% commission + 0.05%
+slippage + 0.3% buffer per side) with realistic execution via Backtrader.
+This is the source of truth for strategy viability.
+
+The gap between research Sharpe (~0.74 for XGB) and backtest Sharpe (-2.32)
+is explained by: transaction costs, compounding with risk_fraction=1.0,
+and the minimum_capital kill-switch at $10k.

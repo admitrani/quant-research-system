@@ -63,7 +63,7 @@ def run_backtest():
     equity_curve = strat.observers.equityobserver.lines.equity.array
     equity_series = pd.Series(equity_curve[:len(df)], index=df.index)
     plot_equity_curve(equity_series)
-    equity_df = pd.DataFrame({"equity": equity_series})
+    equity_df = pd.DataFrame({"datetime": equity_series.index, "equity_curve": equity_series.values})
 
     metrics = extract_backtest_metrics(cerebro, strat)
 

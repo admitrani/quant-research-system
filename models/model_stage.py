@@ -7,22 +7,21 @@ from scipy.stats import linregress
 from models.walkforward.walkforward_runner import (load_gold_dataset, prepare_features_and_target, prepare_walkforward_windows, generate_expanding_windows, run_walkforward_for_model)
 from config.config_loader import load_config
 from models.utils import get_annualization_factor
-from models.metrics import compute_global_sharpe
+from models.metrics import compute_daily_sharpe
 
 
 logger = logging.getLogger(__name__)
 
-config = load_config()
-annualization_factor = get_annualization_factor()
-
-threshold = config["system"]["modeling"]["threshold"]
-initial_train_years = config["system"]["validation"]["initial_train_years"]
-test_months = config["system"]["validation"]["test_months"]
-horizon = config["system"]["modeling"]["horizon"]
-models = config["system"]["modeling"]["models"]
-
 
 def run_full_walkforward_experiment():
+
+    config = load_config()
+    annualization_factor = get_annualization_factor()
+    threshold = config["system"]["modeling"]["threshold"]
+    initial_train_years = config["system"]["validation"]["initial_train_years"]
+    test_months = config["system"]["validation"]["test_months"]
+    horizon = config["system"]["modeling"]["horizon"]
+    models = config["system"]["modeling"]["models"]
 
     logger.info("Loading gold dataset...")
     df = load_gold_dataset()
@@ -39,7 +38,7 @@ def run_full_walkforward_experiment():
 
         logger.info(f"Running walk-forward for model: {model_name}")
 
-        results_df, equity_curve, returns = run_walkforward_for_model(
+        results_df, equity_curve, returns, oos_dates = run_walkforward_for_model(
             prepared_windows,
             model_name=model_name,
             threshold=threshold,
@@ -47,7 +46,7 @@ def run_full_walkforward_experiment():
             save_results=True,
         )
 
-        sharpe_global = compute_global_sharpe(returns, annualization_factor)
+        sharpe_global = compute_daily_sharpe(returns, oos_dates)
 
         slope_auc = linregress(results_df["window"], results_df["auc"]).slope
         slope_sharpe = linregress(results_df["window"], results_df["sharpe"]).slope

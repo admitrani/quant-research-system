@@ -28,10 +28,10 @@ The decision threshold converts predicted probabilities into trading signals.
 signal = P(y=1) > threshold
 
 Values tested:
-- 0.45
 - 0.50
 - 0.55
 - 0.60
+- 0.65
 
 These values represent small perturbations around the baseline (0.5) and avoid aggressive hyperparameter tuning.
 
@@ -115,18 +115,17 @@ Each configuration runs independently.
 
 ---
 
-## Results
+## Results Summary
 
-Best configurations observed:
+The selected candidate is XGBoost (depth=4, threshold=0.60) via composite scoring.
+RF achieved higher base Sharpe (0.837 vs 0.735) but XGBoost showed better robustness
+across the parameter grid (mean Sharpe 1.073 vs 0.729).
 
-| model | depth | threshold | sharpe | equity |
-|---|---|---|---|---|
-RF | 6 | 0.55 | 1.38 | 10.46 |
-XGB | 3 | 0.55 | 1.30 | 8.49 |
+Note: Configurations with threshold=0.65 at shallow depths produce sharpe=0.0
+and equity=1.0x — the model generates no signals above this threshold,
+so no trades are executed. These appear as "neutral" in the grid.
 
-The results indicate that the trading edge remains stable across small parameter changes.
-
-Random Forest with depth 6 and threshold 0.55 emerges as the most robust configuration.
+Source: `robustness_v1.csv`
 
 ---
 

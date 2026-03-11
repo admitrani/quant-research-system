@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from models.utils import get_annualization_factor
+from models.utils import get_annualization_factor, get_risk_policy
 
 def safe_get(d, *keys, default=0):
     for k in keys:
@@ -54,8 +54,14 @@ def extract_backtest_metrics(cerebro, strat):
     drawdown = analyzers.drawdown.get_analysis()
     max_dd = safe_get(drawdown, "max", "drawdown")
 
-    returns_analysis = analyzers.returns.get_analysis()
-    cagr = returns_analysis.get("rnorm100", 0) / 100
+    final_value = cerebro.broker.getvalue()
+    initial_capital = get_risk_policy()["initial_capital"]
+    total_days = (returns_series.index[-1] - returns_series.index[0]).days
+    years = total_days / 365.25
+    if years > 0 and final_value > 0:
+        cagr = (final_value / initial_capital) ** (1 / years) - 1
+    else:
+        cagr = 0.0
 
     trades = analyzers.trades.get_analysis()
     total_trades = safe_get(trades, "total", "total")
@@ -70,17 +76,11 @@ def extract_backtest_metrics(cerebro, strat):
     profit_factor = None
     if gross_loss != 0:
         profit_factor = gross_profit / abs(gross_loss)
-    
-    time_returns = analyzers.timereturn.get_analysis()
-    returns_series = pd.Series(time_returns)
 
     volatility = compute_volatility(returns_series, annualization_factor)
-    
     sortino = compute_sortino(returns_series, annualization_factor)
 
     calmar = compute_calmar(cagr, max_dd)
-
-    final_value = cerebro.broker.getvalue()
 
     avg_trade_return = None
     if total_trades > 0:

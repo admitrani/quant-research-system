@@ -2,11 +2,23 @@ import pandas as pd
 from pathlib import Path
 import backtrader as bt
 
+from config.config_loader import get_gold_path
 
 def load_backtest_dataset():
-
-    project_root = Path(__file__).resolve().parents[1]
-    gold_path = project_root / "storage" / "gold" / "btcusdt_1h_v1.parquet"
+    """
+    Load the complete Gold v1 dataset for backtesting.
+    
+    Returns the full dataset from 2019 without filtering by backtest_start.
+    Temporal filtering occurs implicitly downstream when signal_engine.py
+    calls dropna(subset=["ml_prob"]) — only rows with ML predictions
+    (i.e., OOS windows starting from backtest_start) are retained.
+    
+    Returns
+    -------
+    pd.DataFrame
+        Full Gold v1 dataset with OHLCV, features, and labels.
+    """
+    gold_path = get_gold_path()
 
     df = pd.read_parquet(gold_path)
 
