@@ -14,7 +14,7 @@ def test_robustness_single_config_output():
 
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
 
     prepared_windows = prepare_walkforward_windows(X, y, windows, df)
 

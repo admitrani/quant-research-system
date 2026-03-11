@@ -89,7 +89,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--stage",
         type=str,
-        choices=["metrics", "robustness", "candidate", "all"],
+        choices=["walkforward", "metrics", "robustness", "candidate", "all"],
         default="all",
         help="Start execution from research stage"
     )

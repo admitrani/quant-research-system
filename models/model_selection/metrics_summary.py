@@ -56,19 +56,9 @@ def main():
 
     logger.info(f"Dataset loaded: {len(df)} rows")
 
-    feature_cols = [
-        "return_1h",
-        "return_3h",
-        "return_12h",
-        "volatility_12h",
-        "ma20_distance",
-        "volume_zscore",
-    ]
-
-    logger.info(f"Number of features: {len(feature_cols)}")
-
     logger.info("Preparing features and target...")
     X, y = prepare_features_and_target(df)
+    logger.info(f"Number of features: {len(X.columns)}")
 
     logger.info("Generating walk-forward windows...")
     windows = generate_expanding_windows(df, initial_train_years=initial_train_years, test_months=test_months,)

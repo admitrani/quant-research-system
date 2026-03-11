@@ -19,7 +19,7 @@ from tests.utils.mock_data import create_mock_dataset
 def test_generate_expanding_windows():
 
     df = create_mock_dataset()
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
 
     assert len(windows) > 0
     assert windows[0]["train_start"] < windows[0]["train_end"]
@@ -32,7 +32,7 @@ def test_split_no_overlap():
 
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
 
     X_train, y_train, X_test, y_test = split_window(X, y, windows[0])
 
@@ -47,7 +47,7 @@ def test_scaling_no_data_leakage():
 
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
 
     X_train, y_train, X_test, y_test = split_window(X, y, windows[0])
     X_train_s, X_test_s, scaler = scale_window(X_train, X_test)
@@ -71,7 +71,7 @@ def test_prepare_walkforward_windows_structure():
 
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
 
     prepared_windows = prepare_walkforward_windows(X, y, windows, df)
 
@@ -94,7 +94,7 @@ def test_walkforward_structural_integrity():
 
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
 
     prepared_windows = prepare_walkforward_windows(X, y, windows, df)
 

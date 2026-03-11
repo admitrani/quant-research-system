@@ -22,12 +22,12 @@ def compute_sortino(returns, annualization_factor):
     if len(downside) == 0:
         return None
     
-    downside_std = compute_volatility(downside, annualization_factor)
-
+    downside_std = downside.std()
+    
     if downside_std == 0:
         return None
-
-    return np.mean(returns) / downside_std
+    
+    return (np.mean(returns) * np.sqrt(annualization_factor)) / downside_std
 
 
 def compute_calmar(cagr, max_dd):

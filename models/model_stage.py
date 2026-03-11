@@ -20,7 +20,6 @@ def run_full_walkforward_experiment():
     threshold = config["system"]["modeling"]["threshold"]
     initial_train_years = config["system"]["validation"]["initial_train_years"]
     test_months = config["system"]["validation"]["test_months"]
-    horizon = config["system"]["modeling"]["horizon"]
     models = config["system"]["modeling"]["models"]
 
     logger.info("Loading gold dataset...")

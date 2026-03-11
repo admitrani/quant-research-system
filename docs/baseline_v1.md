@@ -26,6 +26,7 @@ The baseline is intentionally simple and non-optimized.
 Broker simulation:
 - Commission: 0.18% per side
 - Slippage: 0.05% per side
+- Execution buffer: 0.30%
 - Applied to every trade
 
 ---
@@ -75,7 +76,7 @@ Extracted from TradeAnalyzer:
 - Final Value: $9,998
 - CAGR: -35.9%
 - Sharpe: -1.25
-- Sortino: -0.00077
+- Sortino: -6.73
 - Volatility: 1.554
 - Max Drawdown: 93.0%
 - Calmar: -0.386
@@ -95,7 +96,7 @@ Source: `metrics_ema_v1.csv`
 - Final Value: $232,964
 - CAGR: +17.8%
 - Sharpe: 0.572
-- Sortino: 0.000456
+- Sortino: 3.99
 - Volatility: 2.871
 - Max Drawdown: 77.1%
 - Calmar: 0.231

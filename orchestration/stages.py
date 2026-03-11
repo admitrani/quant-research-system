@@ -210,7 +210,7 @@ def run_gold_transformations():
         
         logger.info(f"Gold v1 rows: {row_count}")
 
-        # Emsure storage path exists
+        # Ensure storage path exists
         gold_storage_path = Path("storage/gold")
         gold_storage_path.mkdir(parents=True, exist_ok=True)
 

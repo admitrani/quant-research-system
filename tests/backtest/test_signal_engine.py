@@ -15,7 +15,7 @@ from models.model_factory import get_model
 # Helpers
 
 def generate_mock_probabilities(df, model_name="xgb", max_depth=4,
-                                 initial_train_years=3, test_months=6):
+                                 initial_train_years=2, test_months=6):
     """
     Replicate signal_engine.generate_ml_probabilities() using mock data
     so tests run without the real gold parquet.
@@ -64,7 +64,7 @@ def test_signal_engine_probabilities_in_0_1_range():
 def test_signal_engine_output_length_matches_oos_windows():
     """Total OOS bars should equal sum of test window lengths."""
     df = create_mock_dataset()
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
     expected_oos = sum(
         ((df.index >= w["test_start"]) & (df.index < w["test_end"])).sum()
         for w in windows
@@ -87,7 +87,7 @@ def test_signal_engine_train_strictly_before_test():
     """For every window, all train indices must be strictly before test indices."""
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
     for window in windows:
         X_train, _, X_test, _ = split_window(X, y, window)
         assert X_train.index.max() < X_test.index.min()
@@ -96,7 +96,7 @@ def test_signal_engine_train_strictly_before_test():
 def test_signal_engine_oos_windows_are_contiguous():
     """Test windows must be contiguous — no gap between consecutive windows."""
     df = create_mock_dataset()
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
     for i in range(1, len(windows)):
         assert windows[i]["test_start"] == windows[i - 1]["test_end"]
 
@@ -105,7 +105,7 @@ def test_signal_engine_train_grows_each_window():
     """In expanding walk-forward, each train set must be larger than the previous."""
     df = create_mock_dataset()
     X, y = prepare_features_and_target(df)
-    windows = generate_expanding_windows(df, initial_train_years=3, test_months=6)
+    windows = generate_expanding_windows(df, initial_train_years=2, test_months=6)
     sizes = []
     for window in windows:
         X_train, _, _, _ = split_window(X, y, window)

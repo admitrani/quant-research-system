@@ -119,8 +119,10 @@ def compute_metrics_from_returns(returns_series, annualization_factor):
     volatility = std_h * np.sqrt(annualization_factor)
 
     downside = returns_arr[returns_arr < 0]
-    downside_std = downside.std() * np.sqrt(annualization_factor) if len(downside) > 0 else 0
-    sortino = mean_h / downside_std if downside_std > 0 else None
+    if len(downside) > 0 and downside.std() > 0:
+        sortino = (mean_h * np.sqrt(annualization_factor)) / downside.std()
+    else:
+        sortino = None
 
     return sharpe, sortino, volatility
 
@@ -334,4 +336,3 @@ if __name__ == "__main__":
 
     run_backtest()
     run_buy_and_hold()
-    

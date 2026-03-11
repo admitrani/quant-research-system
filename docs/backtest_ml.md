@@ -71,7 +71,7 @@ Costs are applied by Backtrader's broker engine on every order execution.
 | Final Value         | $9,995      |
 | CAGR                | -36.9%      |
 | Sharpe              | -2.32       |
-| Sortino             | -0.00062    |
+| Sortino             | -5.41    |
 | Volatility          | 0.933       |
 | Max Drawdown        | 90.6%       |
 | Calmar              | -0.407      |

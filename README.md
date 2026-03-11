@@ -61,7 +61,7 @@ Full configuration: `config/v1.yaml`
 | Metric          | ML Strategy | EMA Baseline | Buy & Hold |
 |-----------------|-------------|--------------|------------|
 | Final Value     | $9,995      | $9,998       | $232,964   |
-| CAGR            | -27.2%      | -35.9%       | +17.8%     |
+| CAGR            | -36.9%      | -35.9%       | +17.8%     |
 | Sharpe          | -2.32       | -1.25        | 0.57       |
 | Max Drawdown    | 90.6%       | 93.0%        | 77.1%      |
 | Total Trades    | 665         | 382          | —          |

@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import logging
 from pathlib import Path
 from joblib import Parallel, delayed
@@ -32,15 +33,17 @@ def run_single_config(
 
     sharpe_global = compute_daily_sharpe(returns, oos_dates)
 
+    no_trades = np.all(returns == 0)
+
     return {
         "model": model_name,
         "max_depth": depth,
         "threshold": threshold,
-        "sharpe_global": sharpe_global,
+        "sharpe_global": 0.0 if no_trades else sharpe_global,
         "final_equity_multiple": equity_curve[-1],
-        "mean_sharpe_window": wf_results["sharpe"].mean(),
-        "std_sharpe_window": wf_results["sharpe"].std(),
-        "negative_windows": (wf_results["sharpe"] < 0).sum(),
+        "mean_sharpe_window": 0.0 if no_trades else wf_results["sharpe"].mean(),
+        "std_sharpe_window": 0.0 if no_trades else wf_results["sharpe"].std(),
+        "negative_windows": int((wf_results["sharpe"] < 0).sum()),
     }
 
 
