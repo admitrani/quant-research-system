@@ -1,4 +1,4 @@
-# BTC/USDT ML Trading System
+# Quant Research System
 
 Quantitative trading system for BTC/USDT 1H using Machine Learning with walk-forward validation. Built with production-grade architecture.
 
