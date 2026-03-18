@@ -93,7 +93,6 @@ def validate_silver_prices(con):
         AND open_time <= prev_time;
     """).fetchone()[0]
 
-    # Logging
     logger.info(f"Duplicate rows: {duplicate_count}")
     logger.info(f"Null open_time: {nulls[0]}")
     logger.info(f"Null close_price: {nulls[1]}")

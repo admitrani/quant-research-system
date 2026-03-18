@@ -5,7 +5,7 @@ from ingestion.market_data import get_last_timestamp
 
 def test_get_last_timestamp_empty(tmp_path, monkeypatch):
 
-    # Crear estructura vacía
+    # Create empty structure
     base = tmp_path / "storage/raw/source=binance/dataset=klines/symbol=BTCUSDT/interval=1h"
     base.mkdir(parents=True)
 

@@ -60,8 +60,6 @@ def get_last_timestamp(symbol="BTCUSDT", interval="1h"):
     return max_timestamp
 
 
-# FETCH KLINES (Incremental + Paginación)
-
 def fetch_klines(
     symbol="BTCUSDT",
     interval="1h",
@@ -83,8 +81,6 @@ def fetch_klines(
     limit = ingestion_config["limit"]
     last_ts = get_last_timestamp(symbol, interval)
 
-    # Determinar start_time
-
     if start_date:
         start_time = int(start_date.timestamp() * 1000)
 
@@ -97,8 +93,6 @@ def fetch_klines(
         start_time = int(last_ts) + interval_ms
 
     all_data = []
-
-    # Loop de paginación
 
     while True:
 
@@ -139,11 +133,8 @@ def fetch_klines(
     return df
 
 
-# SAVE RAW (Particionado por fecha real + Append inteligente)
-
 def save_raw(df, symbol="BTCUSDT", interval="1h"):
 
-    # Derivar fecha real desde open_time
     df["_open_time_dt"] = pd.to_datetime(df["0"], unit="ms")
     df["_year"] = df["_open_time_dt"].dt.year
     df["_month"] = df["_open_time_dt"].dt.month.apply(lambda x: f"{x:02d}")
@@ -162,7 +153,6 @@ def save_raw(df, symbol="BTCUSDT", interval="1h"):
 
         group = group.drop(columns=["_open_time_dt", "_year", "_month"])
             
-        # Generate new file
         timestamp_str = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
         file_path = base_path / f"data_{timestamp_str}.parquet"
 

@@ -6,7 +6,7 @@ from ingestion.reprocess import run_range_reprocess
 
 def test_reprocess_rewrites_range(tmp_path, monkeypatch):
 
-    # Crear estructura raw previa
+    # Create Raw structure
     base = tmp_path / "storage/raw/source=binance/dataset=klines/symbol=BTCUSDT/interval=1h/year=2021/month=05"
     base.mkdir(parents=True)
 

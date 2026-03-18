@@ -43,13 +43,13 @@ def basic_raw_checks(base_path, interval_ms):
 
     total = len(timestamps)
 
-    # Duplicados
+    # Duplicates
     duplicates = timestamps.duplicated().sum()
 
-    # Orden
+    # Order
     is_sorted = timestamps.is_monotonic_increasing
 
-    # Continuidad
+    # Continuation
     diffs = timestamps.diff().dropna()
     gaps_series = diffs[diffs > interval_ms]
 
