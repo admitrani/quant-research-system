@@ -101,6 +101,7 @@ Python, Backtrader, XGBoost, DuckDB, Pandas, scikit-learn
 
 ## Project Structure
 
+```
 config/              # v1.yaml, config_loader.py
 ingestion/           # API client, market data, audit
 transformations/     # Silver/Gold SQL models
@@ -111,4 +112,4 @@ backtests/v1/        # ML backtest, EMA/B&H baselines, metrics
 storage/             # Bronze/Silver/Gold parquet files
 tests/               # 73 tests covering critical paths
 docs/                # Specifications, data freeze, risk policy
-
+```
