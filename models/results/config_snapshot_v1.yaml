@@ -1,0 +1,61 @@
+execution:
+  mode: batch
+  frequency: daily
+
+storage:
+  format: parquet
+  partition_by: date
+
+market_data:
+  source: binance
+
+  symbols:
+    - BTCUSDT
+
+  intervals:
+    - 1h
+
+  historical_start: "2019-01-01"
+
+  ingestion:
+    limit: 1000
+    max_retries: 5
+    backoff_seconds: 1.0
+
+system:
+  version: v1
+
+  modeling:
+    horizon: 3
+    mode: long_flat
+    threshold: 0.5
+    models:
+      - logistic
+      - rf
+      - xgb
+    execution:
+      exit_threshold: 0.5
+
+  validation:
+    scheme: expanding
+    initial_train_years: 2
+    test_months: 6
+    retrain_each_window: true
+    backtest_start: "2021-01-01 12:00:00"
+
+  costs:
+    broker: ibkr
+    commission_per_side: 0.0018
+    slippage_per_side: 0.0005
+    buffer: 0.003
+
+  risk:
+    initial_capital: 100000
+    position_sizing: fixed_fraction
+    risk_fraction: 1.0
+    compounding: true
+    max_positions: 1
+    max_drawdown_limit: 1.0
+    minimum_capital: 10000
+    min_position_size: 0.00000001
+

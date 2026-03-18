@@ -1,0 +1,27 @@
+{
+    "model": "xgb",
+    "baseline_config": {
+        "threshold": 0.5,
+        "max_depth": 4
+    },
+    "baseline_metrics": {
+        "sharpe": 0.7351423259503584,
+        "equity_multiple": 3.1181172145309892
+    },
+    "robust_config": {
+        "threshold": 0.6,
+        "max_depth": 4
+    },
+    "robust_config_metrics": {
+        "sharpe_global": 1.4969001510148434,
+        "equity_multiple": 4.706382688256998,
+        "mean_sharpe_window": 1.5987643053990317,
+        "std_sharpe_window": 1.6719936791590848,
+        "negative_windows": 1
+    },
+    "robustness_summary": {
+        "mean_sharpe": 1.1369576810888,
+        "best_sharpe": 1.4969001510148434,
+        "configs_tested": 12
+    }
+}

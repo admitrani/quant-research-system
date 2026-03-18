@@ -109,6 +109,6 @@ models/              # Walk-forward, robustness, candidate selection
 strategies/          # ML strategy (Backtrader)
 backtests/v1/        # ML backtest, EMA/B&H baselines, metrics
 storage/             # Bronze/Silver/Gold parquet files
-tests/               # 71 tests covering critical paths
+tests/               # 73 tests covering critical paths
 docs/                # Specifications, data freeze, risk policy
 
